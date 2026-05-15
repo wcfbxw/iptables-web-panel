@@ -20,6 +20,3 @@ A lightweight traffic forwarding web panel based on Python Flask + Iptables. Eas
 
 ```bash
 wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/install.sh && sudo bash install.sh
-
-```bash
-sudo systemctl stop iptables-panel && sudo systemctl disable iptables-panel && sudo rm /etc/systemd/system/iptables-panel.service && sudo systemctl daemon-reload && sudo rm -rf /opt/iptables-panel && echo "✅ 卸载完成！面板及服务已彻底清理。"
