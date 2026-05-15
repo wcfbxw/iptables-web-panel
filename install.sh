@@ -7,7 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "====================================================="
-echo "   🚀 欢迎安装 Iptables 流量中转面板 (双语 Pro 版)   "
+echo "   🚀 欢迎安装 Iptables 流量中转面板 (双语备注 Pro 版)   "
 echo "====================================================="
 
 read -p "👉 请设置面板运行端口 [默认: 5000]: " PANEL_PORT
@@ -29,7 +29,7 @@ echo "📁 正在配置程序文件..."
 INSTALL_DIR="/opt/iptables-panel"
 mkdir -p $INSTALL_DIR
 
-# 写入支持双语切换的 panel.py
+# 写入支持双语和备注模块的 panel.py
 cat << 'EOF' > $INSTALL_DIR/panel.py
 import subprocess, ipaddress, os, argparse, re
 from flask import Flask, request, render_template_string, session, redirect, url_for
@@ -38,33 +38,35 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=5000)
 parser.add_argument('--user', type=str, default='admin')
 parser.add_argument('--password', type=str, default='123456')
-args = parser.parse_args()
+args = parser.parseargs()
 
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# --- 双语字典 ---
+# --- 双语字典 (加入备注字段) ---
 T = {
     'zh': {
         'login_title': '🛡️ 中转面板登录', 'username': '用户名', 'password': '密码', 'login_btn': '安全登录',
         'panel_title': '🚀 流量中转管理面板', 'logout': '安全退出', 'add_rule': '➕ 新增端口转发',
-        'protocol': '转发协议', 'local_port': '本地监听端口', 'target_ip': '目标 IP 地址', 'target_port': '目标端口',
-        'add_btn': '立即添加转发规则', 'cur_rules': '📋 当前生效规则', 'proto': '协议', 'forward_to': '转发至',
+        'protocol': '转发协议', 'local_port': '监听端口', 'target_ip': '目标 IP 地址', 'target_port': '目标端口',
+        'remark': '备注信息', 'remark_ph': '选填 (如: Web/游戏服)', 'add_btn': '立即添加转发规则', 
+        'cur_rules': '📋 当前生效规则', 'proto': '协议', 'forward_to': '转发至',
         'action': '操作', 'delete': '🗑️ 删除', 'no_rules': '当前没有配置任何转发规则。',
-        'confirm_del': '确定要删除这条规则吗？', 'tcp_only': '纯 TCP (网页/SSH等)',
-        'udp_only': '纯 UDP (Hysteria2/游戏)', 'dual_stack': 'TCP + UDP 双栈',
-        'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是纯数字！', 'err_ip': '无效的 IP 地址！'
+        'confirm_del': '确定要删除这条规则吗？', 'tcp_only': '纯 TCP (网页/SSH)',
+        'udp_only': '纯 UDP (Hysteria2)', 'dual_stack': 'TCP + UDP 双栈',
+        'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是数字！', 'err_ip': '无效的 IP 地址！'
     },
     'en': {
         'login_title': '🛡️ Panel Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Secure Login',
         'panel_title': '🚀 Traffic Forwarding Panel', 'logout': 'Logout', 'add_rule': '➕ Add Port Forwarding',
         'protocol': 'Protocol', 'local_port': 'Local Port', 'target_ip': 'Target IP', 'target_port': 'Target Port',
-        'add_btn': 'Add Forwarding Rule', 'cur_rules': '📋 Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
+        'remark': 'Remark / Note', 'remark_ph': 'Optional', 'add_btn': 'Add Forwarding Rule', 
+        'cur_rules': '📋 Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
         'action': 'Action', 'delete': '🗑️ Delete', 'no_rules': 'No rules configured currently.',
-        'confirm_del': 'Are you sure you want to delete this rule?', 'tcp_only': 'TCP Only (Web/SSH)',
-        'udp_only': 'UDP Only (Hysteria2/Games)', 'dual_stack': 'TCP + UDP Dual Stack',
-        'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers!', 'err_ip': 'Invalid IP address!'
+        'confirm_del': 'Are you sure you want to delete this rule?', 'tcp_only': 'TCP Only (Web)',
+        'udp_only': 'UDP Only (Hysteria2)', 'dual_stack': 'TCP + UDP Dual',
+        'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers!', 'err_ip': 'Invalid IP!'
     }
 }
 
@@ -103,7 +105,7 @@ LOGIN_HTML = HEADER_HTML + """
 """
 
 DASHBOARD_HTML = HEADER_HTML + """
-<div class="container" style="max-width: 950px; margin-top: 20px; margin-bottom: 50px;">
+<div class="container" style="max-width: 1050px; margin-top: 20px; margin-bottom: 50px;">
     <div class="d-flex justify-content-between mb-4">
         <h2>{{ t.panel_title }}</h2>
         <a href="/logout" class="btn btn-outline-danger">{{ t.logout }}</a>
@@ -114,16 +116,17 @@ DASHBOARD_HTML = HEADER_HTML + """
         <div class="card-header text-primary">{{ t.add_rule }}</div>
         <div class="card-body">
             <form method="POST" action="/add" class="row g-3">
-                <div class="col-md-3"><label class="text-muted">{{ t.protocol }}</label>
+                <div class="col-md-2"><label class="text-muted">{{ t.protocol }}</label>
                     <select class="form-select" name="protocol">
                         <option value="tcp">{{ t.tcp_only }}</option>
                         <option value="udp" selected>{{ t.udp_only }}</option>
                         <option value="all">{{ t.dual_stack }}</option>
                     </select>
                 </div>
-                <div class="col-md-3"><label class="text-muted">{{ t.local_port }}</label><input type="number" class="form-control" name="local_port" required></div>
+                <div class="col-md-2"><label class="text-muted">{{ t.local_port }}</label><input type="number" class="form-control" name="local_port" required></div>
                 <div class="col-md-3"><label class="text-muted">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
-                <div class="col-md-3"><label class="text-muted">{{ t.target_port }}</label><input type="number" class="form-control" name="target_port" required></div>
+                <div class="col-md-2"><label class="text-muted">{{ t.target_port }}</label><input type="number" class="form-control" name="target_port" required></div>
+                <div class="col-md-3"><label class="text-muted">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
                 <div class="col-12 mt-4"><button type="submit" class="btn btn-primary w-100">{{ t.add_btn }}</button></div>
             </form>
         </div>
@@ -133,24 +136,26 @@ DASHBOARD_HTML = HEADER_HTML + """
         <div class="card-header text-success">{{ t.cur_rules }}</div>
         <div class="table-responsive p-0">
             <table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th class="ps-4">{{ t.proto }}</th><th>{{ t.local_port }}</th><th>➡️</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th class="text-end pe-4">{{ t.action }}</th></tr></thead>
+                <thead class="table-light"><tr><th class="ps-4">{{ t.proto }}</th><th>{{ t.local_port }}</th><th>➡️</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th class="text-end pe-4">{{ t.action }}</th></tr></thead>
                 <tbody>
                     {% for rule in rules %}
                     <tr>
                         <td class="ps-4"><span class="badge {% if rule.protocol == 'TCP' %}badge-tcp{% else %}badge-udp{% endif %}">{{ rule.protocol }}</span></td>
                         <td class="fw-bold">{{ rule.local_port }}</td><td class="text-muted">{{ t.forward_to }}</td>
-                        <td><span class="badge bg-secondary">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
+                        <td><span class="badge bg-dark">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
+                        <td><span class="text-muted">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</span></td>
                         <td class="text-end pe-4">
                             <form method="POST" action="/delete" style="display:inline;">
                                 <input type="hidden" name="protocol" value="{{ rule.protocol | lower }}">
                                 <input type="hidden" name="local_port" value="{{ rule.local_port }}">
                                 <input type="hidden" name="target_ip" value="{{ rule.target_ip }}">
                                 <input type="hidden" name="target_port" value="{{ rule.target_port }}">
+                                <input type="hidden" name="remark" value="{{ rule.remark }}">
                                 <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ t.confirm_del }}');">{{ t.delete }}</button>
                             </form>
                         </td>
                     </tr>
-                    {% else %}<tr><td colspan="5" class="text-center py-4">{{ t.no_rules }}</td></tr>{% endfor %}
+                    {% else %}<tr><td colspan="6" class="text-center py-4">{{ t.no_rules }}</td></tr>{% endfor %}
                 </tbody>
             </table>
         </div>
@@ -160,14 +165,27 @@ DASHBOARD_HTML = HEADER_HTML + """
 
 def get_t(): return T[session.get('lang', 'zh')]
 
+# --- 解析底层 iptables-save 提取包含备注的规则 ---
 def get_parsed_rules():
     rules_list = []
     try:
-        res = subprocess.run(['sudo', 'iptables', '-t', 'nat', '-L', 'PREROUTING', '-n'], capture_output=True, text=True)
+        res = subprocess.run(['sudo', 'iptables-save', '-t', 'nat'], capture_output=True, text=True)
         for line in res.stdout.split('\n'):
-            match = re.search(r'(tcp|udp) dpt:(\d+)\s+to:([\d\.]+):(\d+)', line)
-            if match: rules_list.append({'protocol': match.group(1).upper(), 'local_port': match.group(2), 'target_ip': match.group(3), 'target_port': match.group(4)})
-    except Exception: pass
+            if line.startswith('-A PREROUTING') and '-j DNAT' in line:
+                proto_m = re.search(r'-p\s+(tcp|udp)', line)
+                lport_m = re.search(r'--dport\s+(\d+)', line)
+                target_m = re.search(r'--to-destination\s+([\d\.]+):(\d+)', line)
+                remark_m = re.search(r'--comment\s+"([^"]+)"', line)
+                
+                if proto_m and lport_m and target_m:
+                    rules_list.append({
+                        'protocol': proto_m.group(1).upper(),
+                        'local_port': lport_m.group(1),
+                        'target_ip': target_m.group(1),
+                        'target_port': target_m.group(2),
+                        'remark': remark_m.group(1) if remark_m else ''
+                    })
+    except Exception as e: print(e)
     return rules_list
 
 @app.route('/lang/<lang>')
@@ -195,6 +213,10 @@ def index():
 def add_rule():
     if not session.get('logged_in'): return redirect(url_for('login'))
     t, p, l_port, t_ip, t_port = get_t(), request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port')
+    
+    # 清理备注中的引号防止 iptables 语法报错
+    remark = request.form.get('remark', '').replace('"', '').replace("'", "").strip()
+
     if not l_port.isdigit() or not t_port.isdigit(): return redirect(url_for('index', msg=t['err_port'], status="danger"))
     try: ipaddress.ip_address(t_ip)
     except ValueError: return redirect(url_for('index', msg=t['err_ip'], status="danger"))
@@ -202,20 +224,28 @@ def add_rule():
     protos = ['tcp', 'udp'] if p == 'all' else [p]
     try:
         for proto in protos:
-            subprocess.run(['sudo', 'iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', l_port, '-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
-            subprocess.run(['sudo', 'iptables', '-t', 'nat', '-A', 'POSTROUTING', '-p', proto, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'])
+            cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', l_port]
+            if remark: cmd_pre.extend(['-m', 'comment', '--comment', remark])
+            cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
+            subprocess.run(cmd_pre, check=True)
+            
+            subprocess.run(['sudo', 'iptables', '-t', 'nat', '-A', 'POSTROUTING', '-p', proto, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'], check=True)
         return redirect(url_for('index', msg="Success!", status="success"))
-    except: return redirect(url_for('index', msg="Failed", status="danger"))
+    except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
 @app.route('/delete', methods=['POST'])
 def delete_rule():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    p, l_port, t_ip, t_port = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port')
+    p, l_port, t_ip, t_port, remark = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port'), request.form.get('remark', '')
     try:
-        subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', p, '--dport', l_port, '-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
-        subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', p, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'])
+        cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', p, '--dport', l_port]
+        if remark: cmd_pre.extend(['-m', 'comment', '--comment', remark])
+        cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
+        subprocess.run(cmd_pre, check=True)
+        
+        subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', p, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'], check=True)
         return redirect(url_for('index', msg="Deleted", status="warning"))
-    except: return redirect(url_for('index', msg="Failed", status="danger"))
+    except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
 if __name__ == '__main__':
     subprocess.run(['sudo', 'sysctl', '-w', 'net.ipv4.ip_forward=1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
