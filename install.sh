@@ -38,7 +38,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=5000)
 parser.add_argument('--user', type=str, default='admin')
 parser.add_argument('--password', type=str, default='123456')
-args = parser.parseargs()
+args = parser.parse_args()
 
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
 app = Flask(__name__)
