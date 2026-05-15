@@ -21,12 +21,7 @@ A lightweight traffic forwarding web panel based on Python Flask + Iptables. Eas
 - **重启面板服务** (Restart)：`systemctl restart iptables-panel`
 - **停止面板服务** (Stop)：`systemctl stop iptables-panel`
 
-## 🗑️ 一键卸载面板 (Uninstall)
 
-如果您不再需要本面板，可以运行以下命令**一键彻底卸载程序及后台服务** / Run the command below to completely remove the panel and its background service:
-
-```bash
-sudo systemctl stop iptables-panel && sudo systemctl disable iptables-panel && sudo rm -f /etc/systemd/system/iptables-panel.service && sudo systemctl daemon-reload && sudo rm -rf /opt/iptables-panel && echo "✅ 面板及后台服务已彻底卸载 / Uninstalled successfully!"
 
 ## 📦 一键安装脚本 (One-Click Installation)
 
