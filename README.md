@@ -19,4 +19,4 @@ A lightweight traffic forwarding web panel based on Python Flask + Iptables. Eas
 请在具有 `root` 权限的 Linux 终端中运行以下命令 / Run the following command as `root`:
 
 ```bash
-wget -O install.sh [https://raw.githubusercontent.com/你的GitHub用户名/你的仓库名/main/install.sh](https://raw.githubusercontent.com/你的GitHub用户名/你的仓库名/main/install.sh) && sudo bash install.sh
+wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/install.sh && sudo bash install.sh
