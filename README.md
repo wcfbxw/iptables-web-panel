@@ -20,7 +20,13 @@ A lightweight traffic forwarding web panel based on Python Flask + Iptables. Eas
 - **查看运行状态** (Status)：`systemctl status iptables-panel`
 - **重启面板服务** (Restart)：`systemctl restart iptables-panel`
 - **停止面板服务** (Stop)：`systemctl stop iptables-panel`
+## 🗑️ 一键卸载面板 (Uninstall): `sudo systemctl stop iptables-panel && sudo systemctl disable iptables-panel && sudo rm -f /etc/systemd/system/iptables-panel.service && sudo systemctl daemon-reload && sudo rm -rf /opt/iptables-panel && echo "✅ 面板及后台服务已彻底卸载 / Uninstalled successfully!"`
 
+##⚠️ 规则清理提示 (Rules Cleanup)
+卸载面板程序不会中断您已经配置好的流量转发（因为它们已写入内核）。如果您想彻底清空所有的 NAT 转发规则（注意：这也会一并清空 Docker 等其他程序的 NAT 规则），请手动运行：
+
+Uninstalling the panel WILL NOT interrupt your existing forwarding rules. If you want to flush ALL NAT rules (Warning: this will also clear rules for Docker, etc.), run:
+`sudo iptables -t nat -F`
 
 
 ## 📦 一键安装脚本 (One-Click Installation)
