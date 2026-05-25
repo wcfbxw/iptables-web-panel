@@ -7,7 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "====================================================="
-echo "   🚀 欢迎安装 Iptables 流量中转面板 (双语备注 Pro 版)   "
+echo "   🚀 欢迎安装 Iptables 流量中转面板 (支持域名解析版)   "
 echo "====================================================="
 
 read -p "👉 请设置面板运行端口 [默认: 5000]: " PANEL_PORT
@@ -29,9 +29,9 @@ echo "📁 正在配置程序文件..."
 INSTALL_DIR="/opt/iptables-panel"
 mkdir -p $INSTALL_DIR
 
-# 写入支持双语和备注模块的 panel.py
+# 写入支持双语、备注和域名的 panel.py
 cat << 'EOF' > $INSTALL_DIR/panel.py
-import subprocess, ipaddress, os, argparse, re
+import subprocess, ipaddress, os, argparse, re, socket
 from flask import Flask, request, render_template_string, session, redirect, url_for
 
 parser = argparse.ArgumentParser()
@@ -44,29 +44,31 @@ ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# --- 双语字典 (加入备注字段) ---
+# --- 双语字典 (加入备注字段和域名提示) ---
 T = {
     'zh': {
         'login_title': '🛡️ 中转面板登录', 'username': '用户名', 'password': '密码', 'login_btn': '安全登录',
         'panel_title': '🚀 流量中转管理面板', 'logout': '安全退出', 'add_rule': '➕ 新增端口转发',
-        'protocol': '转发协议', 'local_port': '监听端口', 'target_ip': '目标 IP 地址', 'target_port': '目标端口',
+        'protocol': '转发协议', 'local_port': '监听端口', 'target_ip': '目标 IP 或 域名', 'target_port': '目标端口',
         'remark': '备注信息', 'remark_ph': '选填 (如: Web/游戏服)', 'add_btn': '立即添加转发规则', 
         'cur_rules': '📋 当前生效规则', 'proto': '协议', 'forward_to': '转发至',
         'action': '操作', 'delete': '🗑️ 删除', 'no_rules': '当前没有配置任何转发规则。',
         'confirm_del': '确定要删除这条规则吗？', 'tcp_only': '纯 TCP (网页/SSH)',
         'udp_only': '纯 UDP (Hysteria2)', 'dual_stack': 'TCP + UDP 双栈',
-        'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是数字！', 'err_ip': '无效的 IP 地址！'
+        'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是数字！', 
+        'err_ip': '无效的 IP 地址或域名解析失败！'
     },
     'en': {
         'login_title': '🛡️ Panel Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Secure Login',
         'panel_title': '🚀 Traffic Forwarding Panel', 'logout': 'Logout', 'add_rule': '➕ Add Port Forwarding',
-        'protocol': 'Protocol', 'local_port': 'Local Port', 'target_ip': 'Target IP', 'target_port': 'Target Port',
+        'protocol': 'Protocol', 'local_port': 'Local Port', 'target_ip': 'Target IP / Domain', 'target_port': 'Target Port',
         'remark': 'Remark / Note', 'remark_ph': 'Optional', 'add_btn': 'Add Forwarding Rule', 
         'cur_rules': '📋 Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
         'action': 'Action', 'delete': '🗑️ Delete', 'no_rules': 'No rules configured currently.',
         'confirm_del': 'Are you sure you want to delete this rule?', 'tcp_only': 'TCP Only (Web)',
         'udp_only': 'UDP Only (Hysteria2)', 'dual_stack': 'TCP + UDP Dual',
-        'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers!', 'err_ip': 'Invalid IP!'
+        'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers!', 
+        'err_ip': 'Invalid IP or Domain resolution failed!'
     }
 }
 
@@ -165,7 +167,6 @@ DASHBOARD_HTML = HEADER_HTML + """
 
 def get_t(): return T[session.get('lang', 'zh')]
 
-# --- 解析底层 iptables-save 提取包含备注的规则 ---
 def get_parsed_rules():
     rules_list = []
     try:
@@ -212,14 +213,22 @@ def index():
 @app.route('/add', methods=['POST'])
 def add_rule():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    t, p, l_port, t_ip, t_port = get_t(), request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port')
+    t = get_t()
+    p, l_port, t_input, t_port = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip', '').strip(), request.form.get('target_port')
     
-    # 清理备注中的引号防止 iptables 语法报错
     remark = request.form.get('remark', '').replace('"', '').replace("'", "").strip()
 
     if not l_port.isdigit() or not t_port.isdigit(): return redirect(url_for('index', msg=t['err_port'], status="danger"))
-    try: ipaddress.ip_address(t_ip)
-    except ValueError: return redirect(url_for('index', msg=t['err_ip'], status="danger"))
+    
+    # --- 增加域名解析逻辑 ---
+    try:
+        t_ip = socket.gethostbyname(t_input)
+    except Exception:
+        return redirect(url_for('index', msg=t['err_ip'], status="danger"))
+        
+    # 如果用户输入的是域名，则在备注里附加上域名，以便记忆
+    if t_ip != t_input:
+        remark = f"{remark} [{t_input}]".strip()
     
     protos = ['tcp', 'udp'] if p == 'all' else [p]
     try:
@@ -278,7 +287,7 @@ systemctl enable iptables-panel > /dev/null 2>&1
 systemctl restart iptables-panel
 
 echo "====================================================="
-echo "✅ 安装成功！面板已在后台运行并设置开机自启。"
+echo "✅ 安装/更新成功！面板已在后台运行并设置开机自启。"
 echo "🌐 访问地址: http://你的服务器IP:$PANEL_PORT"
 echo "👤 登录账号: $PANEL_USER"
 echo "🔑 登录密码: $PANEL_PASS"
