@@ -55,6 +55,28 @@ for line in result.stdout.splitlines():
     pre_cmd.extend(["-j", "DNAT", "--to-destination", f"{target_ip}:{target_port}"])
     run(pre_cmd)
     run(["iptables", "-t", "nat", "-D", "POSTROUTING", "-p", proto, "-d", target_ip, "--dport", target_port, "-j", "MASQUERADE"])
+
+filter_result = subprocess.run(["iptables-save"], capture_output=True, text=True)
+for line in filter_result.stdout.splitlines():
+    if not line.startswith("-A FORWARD") or "iptables-panel-track:" not in line:
+        continue
+
+    proto_m = re.search(r"-p\s+(tcp|udp)", line)
+    comment_m = re.search(r'--comment\s+"?([^"]*iptables-panel-track:[^"\s]+)"?', line)
+    if not proto_m or not comment_m:
+        continue
+
+    proto = proto_m.group(1)
+    comment = comment_m.group(1)
+    dst_m = re.search(r"-d\s+([\d\.\/]+)", line)
+    src_m = re.search(r"-s\s+([\d\.\/]+)", line)
+    dport_m = re.search(r"--dport\s+(\d+)", line)
+    sport_m = re.search(r"--sport\s+(\d+)", line)
+
+    if dst_m and dport_m:
+        run(["iptables", "-D", "FORWARD", "-p", proto, "-d", dst_m.group(1), "--dport", dport_m.group(1), "-m", "comment", "--comment", comment, "-j", "ACCEPT"])
+    elif src_m and sport_m:
+        run(["iptables", "-D", "FORWARD", "-p", proto, "-s", src_m.group(1), "--sport", sport_m.group(1), "-m", "comment", "--comment", comment, "-j", "ACCEPT"])
 PY
 }
 
@@ -126,7 +148,7 @@ mkdir -p $INSTALL_DIR
 
 # 写入支持双语、备注和域名的 panel.py
 cat << 'EOF' > $INSTALL_DIR/panel.py
-import subprocess, ipaddress, os, argparse, re, socket
+import subprocess, ipaddress, os, argparse, re, socket, json, hashlib, threading, time, datetime
 from flask import Flask, request, render_template_string, session, redirect, url_for
 
 parser = argparse.ArgumentParser()
@@ -138,6 +160,8 @@ args = parser.parse_args()
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+QUOTA_FILE = "/opt/iptables-panel/quotas.json"
+TRACK_PREFIX = "iptables-panel-track:"
 
 # --- 双语字典 (加入备注字段和域名提示) ---
 T = {
@@ -154,7 +178,11 @@ T = {
         'err_ip': '无效的 IP 地址或域名解析失败！', 'err_duplicate': '规则已存在，无需重复添加。',
         'add_success': '添加成功！', 'del_success': '删除成功',
         'login_error': '用户名或密码错误', 'overview': '运行概览', 'total_rules': '总规则',
-        'tcp_rules': 'TCP 规则', 'udp_rules': 'UDP 规则'
+        'tcp_rules': 'TCP 规则', 'udp_rules': 'UDP 规则', 'traffic': '流量',
+        'quota': '流量上限', 'quota_ph': '选填，单位 MB', 'quota_reached': '流量已达上限，规则已自动停用。',
+        'err_quota': '流量上限必须是数字，单位 MB。', 'unlimited': '不限',
+        'traffic_note': '流量为上行 + 下行总和', 'expires_at': '到期时间', 'expires_ph': 'UTC+8',
+        'err_expires': '到期时间格式无效，请使用 UTC+8 时间。'
     },
     'en': {
         'login_title': '🛡️ Panel Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Secure Login',
@@ -169,7 +197,11 @@ T = {
         'err_ip': 'Invalid IP or Domain resolution failed!', 'err_duplicate': 'Rule already exists. No duplicate was added.',
         'add_success': 'Added successfully!', 'del_success': 'Deleted',
         'login_error': 'Invalid username or password', 'overview': 'Overview', 'total_rules': 'Total Rules',
-        'tcp_rules': 'TCP Rules', 'udp_rules': 'UDP Rules'
+        'tcp_rules': 'TCP Rules', 'udp_rules': 'UDP Rules', 'traffic': 'Traffic',
+        'quota': 'Traffic Limit', 'quota_ph': 'Optional, MB', 'quota_reached': 'Traffic limit reached. Rule was disabled.',
+        'err_quota': 'Traffic limit must be a number in MB.', 'unlimited': 'Unlimited',
+        'traffic_note': 'Traffic is upload + download total', 'expires_at': 'Expires At', 'expires_ph': 'UTC+8',
+        'err_expires': 'Invalid expiration time. Use UTC+8 time.'
     }
 }
 
@@ -493,7 +525,9 @@ DASHBOARD_HTML = HEADER_HTML + """
                 <div class="col-lg-2 col-md-4"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
                 <div class="col-lg-3 col-md-4"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
                 <div class="col-lg-2 col-md-4"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
-                <div class="col-lg-3 col-md-8"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
+                <div class="col-lg-2 col-md-6"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
+                <div class="col-lg-1 col-md-6"><label class="form-label">{{ t.quota }}</label><input type="number" min="1" step="1" class="form-control" name="quota_mb" placeholder="MB"></div>
+                <div class="col-lg-2 col-md-6"><label class="form-label">{{ t.expires_at }}</label><input type="datetime-local" class="form-control" name="expires_at" title="{{ t.expires_ph }}"></div>
                 <div class="col-12"><button type="submit" class="btn btn-primary w-100">{{ t.add_btn }}</button></div>
             </form>
         </div>
@@ -503,7 +537,7 @@ DASHBOARD_HTML = HEADER_HTML + """
         <div class="panel-header">{{ t.cur_rules }}</div>
         <div class="table-responsive p-0">
             <table class="table table-hover">
-                <thead><tr><th class="ps-4">{{ t.proto }}</th><th>{{ t.local_port }}</th><th>{{ t.forward_to }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th class="text-end pe-4">{{ t.action }}</th></tr></thead>
+                <thead><tr><th class="ps-4">{{ t.proto }}</th><th>{{ t.local_port }}</th><th>{{ t.forward_to }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th>{{ t.traffic }}<br><small class="text-muted">{{ t.traffic_note }}</small></th><th>{{ t.expires_at }}</th><th class="text-end pe-4">{{ t.action }}</th></tr></thead>
                 <tbody>
                     {% for rule in rules %}
                     <tr>
@@ -511,6 +545,8 @@ DASHBOARD_HTML = HEADER_HTML + """
                         <td class="fw-bold">{{ rule.local_port }}</td><td class="text-muted">{{ t.forward_to }}</td>
                         <td><span class="target-pill">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
                         <td><div class="remark-cell" title="{{ rule.remark }}">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</div></td>
+                        <td><span class="text-muted">{{ rule.traffic_text }}</span></td>
+                        <td><span class="text-muted">{{ rule.expires_text }}</span></td>
                         <td class="text-end pe-4">
                             <form method="POST" action="/delete" style="display:inline;">
                                 <input type="hidden" name="protocol" value="{{ rule.protocol | lower }}">
@@ -522,7 +558,7 @@ DASHBOARD_HTML = HEADER_HTML + """
                             </form>
                         </td>
                     </tr>
-                    {% else %}<tr><td colspan="6" class="text-center empty-row">{{ t.no_rules }}</td></tr>{% endfor %}
+                    {% else %}<tr><td colspan="8" class="text-center empty-row">{{ t.no_rules }}</td></tr>{% endfor %}
                 </tbody>
             </table>
         </div>
@@ -532,8 +568,147 @@ DASHBOARD_HTML = HEADER_HTML + """
 
 def get_t(): return T[session.get('lang', 'zh')]
 
+def load_quotas():
+    try:
+        with open(QUOTA_FILE, "r", encoding="utf-8") as quota_file:
+            data = json.load(quota_file)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_quotas(quotas):
+    tmp_path = QUOTA_FILE + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as quota_file:
+        json.dump(quotas, quota_file, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, QUOTA_FILE)
+
+def parse_quota_mb(value):
+    value = (value or "").strip()
+    if not value:
+        return 0
+    if not value.isdigit() or int(value) <= 0:
+        return None
+    return int(value) * 1024 * 1024
+
+def parse_expires_at(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    try:
+        parsed = datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M")
+        return parsed.strftime("%Y-%m-%dT%H:%M")
+    except ValueError:
+        return None
+
+def utc8_now():
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+
+def limit_quota_bytes(limit):
+    if isinstance(limit, dict):
+        return int(limit.get("quota_bytes", 0) or 0)
+    return int(limit or 0)
+
+def limit_expires_at(limit):
+    if isinstance(limit, dict):
+        return str(limit.get("expires_at", "") or "")
+    return ""
+
+def format_expires(value):
+    return value.replace("T", " ") + " UTC+8" if value else "不限"
+
+def is_expired(value):
+    if not value:
+        return False
+    try:
+        return utc8_now() >= datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return False
+
+def format_bytes(value):
+    value = int(value or 0)
+    units = ("B", "KB", "MB", "GB", "TB")
+    size = float(value)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024
+
+def rule_track_id(protocol, local_port, target_ip, target_port, remark):
+    raw = f"{protocol.lower()}|{local_port}|{target_ip}|{target_port}|{remark or ''}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+def tracking_comment(track_id):
+    return TRACK_PREFIX + track_id
+
+def get_tracking_bytes():
+    usage = {}
+    try:
+        res = subprocess.run(['sudo', 'iptables-save', '-c'], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if '-A FORWARD' not in line or TRACK_PREFIX not in line:
+                continue
+            counter_m = re.match(r'\[(\d+):(\d+)\]\s+', line)
+            comment_m = re.search(r'--comment\s+"?(' + re.escape(TRACK_PREFIX) + r'[a-f0-9]+)"?', line)
+            if counter_m and comment_m:
+                track_id = comment_m.group(1).replace(TRACK_PREFIX, "")
+                usage[track_id] = usage.get(track_id, 0) + int(counter_m.group(2))
+    except Exception as e:
+        print(e)
+    return usage
+
+def add_tracking_rules(protocol, target_ip, target_port, track_id):
+    comment = tracking_comment(track_id)
+    subprocess.run(['sudo', 'iptables', '-A', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
+    subprocess.run(['sudo', 'iptables', '-A', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
+
+def delete_tracking_rules(protocol, target_ip, target_port, track_id):
+    comment = tracking_comment(track_id)
+    subprocess.run(['sudo', 'iptables', '-D', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
+    subprocess.run(['sudo', 'iptables', '-D', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
+
+def delete_forwarding_rule(protocol, local_port, target_ip, target_port, remark):
+    cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', protocol, '--dport', local_port]
+    if remark:
+        cmd_pre.extend(['-m', 'comment', '--comment', remark])
+    cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{target_ip}:{target_port}'])
+    subprocess.run(cmd_pre, check=False)
+    subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', protocol, '-d', target_ip, '--dport', target_port, '-j', 'MASQUERADE'], check=False)
+    delete_tracking_rules(protocol, target_ip, target_port, rule_track_id(protocol, local_port, target_ip, target_port, remark))
+
+def remove_quota(track_id):
+    quotas = load_quotas()
+    if track_id in quotas:
+        quotas.pop(track_id, None)
+        save_quotas(quotas)
+
+def enforce_quotas_once():
+    quotas = load_quotas()
+    if not quotas:
+        return
+    changed = False
+    for rule in get_parsed_rules():
+        limit = quotas.get(rule['track_id'], 0)
+        quota = limit_quota_bytes(limit)
+        expires_at = limit_expires_at(limit)
+        if (quota and rule['traffic_bytes'] >= quota) or is_expired(expires_at):
+            delete_forwarding_rule(rule['protocol'].lower(), rule['local_port'], rule['target_ip'], rule['target_port'], rule['remark'])
+            quotas.pop(rule['track_id'], None)
+            changed = True
+    if changed:
+        save_quotas(quotas)
+
+def quota_watcher():
+    while True:
+        try:
+            enforce_quotas_once()
+        except Exception as e:
+            print(e)
+        time.sleep(30)
+
 def get_parsed_rules():
     rules_list = []
+    traffic_bytes = get_tracking_bytes()
+    quotas = load_quotas()
     try:
         res = subprocess.run(['sudo', 'iptables-save', '-t', 'nat'], capture_output=True, text=True)
         for line in res.stdout.split('\n'):
@@ -544,12 +719,28 @@ def get_parsed_rules():
                 remark_m = re.search(r'--comment\s+"([^"]+)"', line)
                 
                 if proto_m and lport_m and target_m:
+                    protocol = proto_m.group(1)
+                    local_port = lport_m.group(1)
+                    target_ip = target_m.group(1)
+                    target_port = target_m.group(2)
+                    remark = remark_m.group(1) if remark_m else ''
+                    track_id = rule_track_id(protocol, local_port, target_ip, target_port, remark)
+                    used_bytes = traffic_bytes.get(track_id, 0)
+                    limit = quotas.get(track_id, 0)
+                    quota_bytes = limit_quota_bytes(limit)
+                    expires_at = limit_expires_at(limit)
                     rules_list.append({
-                        'protocol': proto_m.group(1).upper(),
-                        'local_port': lport_m.group(1),
-                        'target_ip': target_m.group(1),
-                        'target_port': target_m.group(2),
-                        'remark': remark_m.group(1) if remark_m else ''
+                        'protocol': protocol.upper(),
+                        'local_port': local_port,
+                        'target_ip': target_ip,
+                        'target_port': target_port,
+                        'remark': remark,
+                        'track_id': track_id,
+                        'traffic_bytes': used_bytes,
+                        'quota_bytes': quota_bytes,
+                        'expires_at': expires_at,
+                        'traffic_text': f"{format_bytes(used_bytes)} / {format_bytes(quota_bytes) if quota_bytes else '不限'}",
+                        'expires_text': format_expires(expires_at)
                     })
     except Exception as e: print(e)
     return rules_list
@@ -595,8 +786,12 @@ def add_rule():
     p, l_port, t_input, t_port = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip', '').strip(), request.form.get('target_port')
     
     remark = request.form.get('remark', '').replace('"', '').replace("'", "").strip()
+    quota_bytes = parse_quota_mb(request.form.get('quota_mb'))
+    expires_at = parse_expires_at(request.form.get('expires_at'))
 
     if not valid_port(l_port) or not valid_port(t_port): return redirect(url_for('index', msg=t['err_port'], status="danger"))
+    if quota_bytes is None: return redirect(url_for('index', msg=t['err_quota'], status="danger"))
+    if expires_at is None: return redirect(url_for('index', msg=t['err_expires'], status="danger"))
     
     # --- 增加域名解析逻辑 ---
     try:
@@ -613,6 +808,7 @@ def add_rule():
         return redirect(url_for('index', msg=t['err_duplicate'], status="warning"))
 
     try:
+        quotas = load_quotas()
         for proto in protos:
             cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', l_port]
             if remark: cmd_pre.extend(['-m', 'comment', '--comment', remark])
@@ -620,6 +816,14 @@ def add_rule():
             subprocess.run(cmd_pre, check=True)
             
             subprocess.run(['sudo', 'iptables', '-t', 'nat', '-A', 'POSTROUTING', '-p', proto, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'], check=True)
+            track_id = rule_track_id(proto, l_port, t_ip, t_port, remark)
+            add_tracking_rules(proto, t_ip, t_port, track_id)
+            if quota_bytes or expires_at:
+                quotas[track_id] = {
+                    "quota_bytes": quota_bytes,
+                    "expires_at": expires_at,
+                }
+        save_quotas(quotas)
         return redirect(url_for('index', msg=t['add_success'], status="success"))
     except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
@@ -629,17 +833,15 @@ def delete_rule():
     t = get_t()
     p, l_port, t_ip, t_port, remark = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port'), request.form.get('remark', '')
     try:
-        cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', p, '--dport', l_port]
-        if remark: cmd_pre.extend(['-m', 'comment', '--comment', remark])
-        cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
-        subprocess.run(cmd_pre, check=True)
-        
-        subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', p, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'], check=True)
+        track_id = rule_track_id(p, l_port, t_ip, t_port, remark)
+        delete_forwarding_rule(p, l_port, t_ip, t_port, remark)
+        remove_quota(track_id)
         return redirect(url_for('index', msg=t['del_success'], status="warning"))
     except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
 if __name__ == '__main__':
     subprocess.run(['sudo', 'sysctl', '-w', 'net.ipv4.ip_forward=1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    threading.Thread(target=quota_watcher, daemon=True).start()
     app.run(host='0.0.0.0', port=PANEL_PORT)
 EOF
 
