@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-label="Glass UI preview">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef4f7"/>
+      <stop offset="0.52" stop-color="#f8fbfc"/>
+      <stop offset="1" stop-color="#e9f3f1"/>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#283f5a" flood-opacity=".14"/>
+    </filter>
+  </defs>
+  <rect width="960" height="560" fill="url(#bg)"/>
+  <rect x="40" y="34" width="880" height="58" rx="8" fill="#ffffff" fill-opacity=".72" stroke="#cbd5e1" filter="url(#soft)"/>
+  <rect x="64" y="50" width="38" height="28" rx="8" fill="#3157d5"/>
+  <text x="76" y="69" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="700">IP</text>
+  <text x="118" y="69" fill="#102033" font-family="Arial, sans-serif" font-size="18" font-weight="700">Traffic Forwarding Panel</text>
+  <rect x="764" y="49" width="128" height="28" rx="8" fill="#ffffff" fill-opacity=".65" stroke="#cbd5e1"/>
+  <text x="802" y="68" fill="#3157d5" font-family="Arial, sans-serif" font-size="14" font-weight="700">Glass C</text>
+  <text x="64" y="145" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="800">Glass Control View</text>
+  <g font-family="Arial, sans-serif" filter="url(#soft)">
+    <rect x="64" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <text x="84" y="216" fill="#526173" font-size="13" font-weight="700">Total Rules</text>
+    <text x="84" y="251" fill="#102033" font-size="33" font-weight="800">12</text>
+    <rect x="354" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <text x="374" y="216" fill="#526173" font-size="13" font-weight="700">Traffic</text>
+    <text x="374" y="251" fill="#102033" font-size="26" font-weight="800">8.4 GB / 20 GB</text>
+    <rect x="644" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <text x="664" y="216" fill="#526173" font-size="13" font-weight="700">Time</text>
+    <text x="664" y="251" fill="#102033" font-size="26" font-weight="800">UTC+8</text>
+  </g>
+  <rect x="64" y="296" width="832" height="176" rx="8" fill="#ffffff" fill-opacity=".68" stroke="#cbd5e1" filter="url(#soft)"/>
+  <text x="90" y="332" fill="#102033" font-family="Arial, sans-serif" font-size="18" font-weight="800">Active Rules</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="90" y="356" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".56" stroke="#d9e0e8"/>
+    <rect x="110" y="366" width="44" height="20" rx="6" fill="#3157d5"/>
+    <text x="121" y="381" fill="#ffffff" font-size="12" font-weight="800">TCP</text>
+    <text x="178" y="381" fill="#102033" font-size="15" font-weight="700">443 → 10.0.0.8:8443</text>
+    <text x="442" y="381" fill="#526173" font-size="14">8.4 GB / 20 GB</text>
+    <text x="650" y="381" fill="#526173" font-size="14">2026-07-30 23:59 UTC+8</text>
+    <rect x="90" y="412" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".56" stroke="#d9e0e8"/>
+    <rect x="110" y="422" width="44" height="20" rx="6" fill="#0f766e"/>
+    <text x="119" y="437" fill="#ffffff" font-size="12" font-weight="800">UDP</text>
+    <text x="178" y="437" fill="#102033" font-size="15" font-weight="700">8443 → game.example.com:443</text>
+    <text x="442" y="437" fill="#526173" font-size="14">1.2 GB / unlimited</text>
+    <text x="650" y="437" fill="#526173" font-size="14">Unlimited</text>
+  </g>
+  <rect x="64" y="492" width="832" height="34" rx="8" fill="#3157d5"/>
+  <text x="405" y="515" fill="#ffffff" font-family="Arial, sans-serif" font-size="15" font-weight="800">Add Forwarding Rule</text>
+</svg>

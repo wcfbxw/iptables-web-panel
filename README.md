@@ -6,7 +6,13 @@
 
 一个轻量级 Web 流量中转面板，用来通过网页管理 TCP / UDP 端口转发规则。
 
-稳定版使用 `Python Flask + iptables`。实验版 `install-v2.sh` 支持 `Python/Rust + iptables/nftables` 多种组合。
+稳定版使用 `Python Flask + iptables`。实验版 `install-v2.sh` 支持 `Python/Rust + iptables/nftables` 多种组合。安装时可以选择 UI 风格：网络拓扑版 A 或玻璃拟态版 C。
+
+### 面板风格预览
+
+| 网络拓扑版 A | 玻璃拟态版 C |
+| --- | --- |
+| ![网络拓扑版 A](docs/ui-network-map.svg) | ![玻璃拟态版 C](docs/ui-glass.svg) |
 
 ### 核心功能
 
@@ -38,6 +44,7 @@ wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/m
 - 面板运行端口，默认 `5000`
 - 管理员用户名，默认 `admin`
 - 管理员密码，默认 `123456`
+- UI 风格，默认 `网络拓扑版 A`，也可以选择 `玻璃拟态版 C`
 
 安装完成后访问：
 
@@ -61,6 +68,7 @@ wget -O install-v2.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-pane
 ```
 
 实验版同样支持流量统计、流量上限、UTC+8 到期时间和自动停用规则。
+实验版安装时同样可以选择 UI 风格：网络拓扑版 A 或玻璃拟态版 C。
 
 说明：
 
@@ -179,7 +187,13 @@ sudo nft delete table ip iptables_panel
 
 A lightweight web panel for managing TCP / UDP traffic forwarding rules.
 
-The stable installer uses `Python Flask + iptables`. The experimental installer `install-v2.sh` supports multiple combinations of `Python/Rust + iptables/nftables`.
+The stable installer uses `Python Flask + iptables`. The experimental installer `install-v2.sh` supports multiple combinations of `Python/Rust + iptables/nftables`. During installation, you can choose either UI style: Network Map A or Glass C.
+
+### UI Style Preview
+
+| Network Map A | Glass C |
+| --- | --- |
+| ![Network Map A](docs/ui-network-map.svg) | ![Glass C](docs/ui-glass.svg) |
 
 ### Features
 
@@ -211,6 +225,7 @@ The installer asks for:
 - Panel port, default `5000`
 - Admin username, default `admin`
 - Admin password, default `123456`
+- UI style, default `Network Map A`; you can also choose `Glass C`
 
 After installation, open:
 
@@ -234,6 +249,7 @@ wget -O install-v2.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-pane
 ```
 
 The experimental installer also supports traffic usage, traffic quota, UTC+8 expiration time, and automatic rule disabling.
+The experimental installer also lets you choose the UI style: Network Map A or Glass C.
 
 Notes:
 

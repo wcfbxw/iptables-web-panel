@@ -39,6 +39,16 @@ read -p "👉 请设置管理员密码 [默认: 123456]: " PANEL_PASS
 PANEL_PASS=${PANEL_PASS:-123456}
 
 echo ""
+echo "请选择面板 UI 风格:"
+echo "1) 网络拓扑版 A：突出转发路径和规则关系"
+echo "2) 玻璃拟态版 C：更现代、更适合展示"
+read -p "👉 请选择 UI 风格 [默认: 1]: " PANEL_THEME_CHOICE
+case "${PANEL_THEME_CHOICE:-1}" in
+  2) PANEL_THEME="glass" ;;
+  *) PANEL_THEME="map" ;;
+esac
+
+echo ""
 echo "将安装: $PANEL_RUNTIME + $FIREWALL_BACKEND"
 echo "升级说明: 重新运行本脚本会覆盖面板程序和 systemd 服务，不会主动清空已有转发规则。"
 echo ""
@@ -80,7 +90,9 @@ parser.add_argument("--port", type=int, default=5000)
 parser.add_argument("--user", default="admin")
 parser.add_argument("--password", default="123456")
 parser.add_argument("--backend", choices=("iptables", "nftables"), default="iptables")
+parser.add_argument("--theme", default="map")
 args = parser.parse_args()
+PANEL_THEME = args.theme if args.theme in ("map", "glass") else "map"
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -99,7 +111,10 @@ button,.btn{border:0;border-radius:8px;padding:10px 14px;font-weight:750;text-de
 table{width:100%;border-collapse:collapse}th{background:#f7f9fb;color:#6b7685;text-align:left;font-size:.82rem;text-transform:uppercase}th,td{padding:13px 16px;border-bottom:1px solid #edf1f5}.pill{display:inline-block;border-radius:6px;padding:5px 8px;background:#111827;color:#fff;font-weight:750}.tcp{background:#2563eb}.udp{background:#7c3aed}.msg{padding:12px 14px;border-radius:8px;background:#eef6ff;color:#1d4ed8;margin-top:16px}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.metric{background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:16px 18px}.num{font-size:1.8rem;font-weight:850}.muted{color:#6b7685}
 .login{min-height:calc(100vh - 65px);display:grid;place-items:center;padding:18px}.login-card{width:min(100%,420px);background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:28px;box-shadow:0 10px 26px rgba(23,32,51,.06)}
+.theme-map{background:#f2f7fb}.theme-map .brand:after{content:"A";margin-left:8px;color:#0f766e}.theme-map .topology{display:grid;gap:12px;margin-top:18px}.theme-map .route{display:grid;grid-template-columns:1fr 54px 1fr 54px 1fr;align-items:center;gap:10px}.theme-map .node{border:1px solid #d9e0e8;border-radius:8px;background:#fff;padding:13px 14px;box-shadow:0 10px 24px rgba(15,118,110,.07)}.theme-map .line{height:2px;background:linear-gradient(90deg,#14b8a6,#2563eb)}
+.theme-glass{background:linear-gradient(135deg,#eef4f7,#f8fbfc 48%,#e9f3f1);color:#102033}.theme-glass .top,.theme-glass .card,.theme-glass .metric{background:rgba(255,255,255,.68);border-color:rgba(148,163,184,.34);box-shadow:0 18px 44px rgba(40,63,90,.12);backdrop-filter:blur(18px)}.theme-glass .head, .theme-glass th{background:rgba(255,255,255,.48)}.theme-glass .brand:after{content:"C";margin-left:8px;color:#3157d5}.glass-rail{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.glass-item{border:1px solid rgba(148,163,184,.32);border-radius:8px;padding:14px 16px;background:rgba(255,255,255,.52)}
 @media(max-width:850px){.grid,.metrics{grid-template-columns:1fr}.top{padding:0 14px}.wrap{padding:20px 14px 34px}table{min-width:760px}}
+@media(max-width:850px){.theme-map .route,.glass-rail{grid-template-columns:1fr}.theme-map .line{height:24px;width:2px;margin-left:18px}}
 </style>
 """
 
@@ -114,10 +129,11 @@ LOGIN = """
 
 PAGE = """
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forward Panel</title>""" + CSS + """</head>
-<body><div class="top"><div class="brand">IP Forward Panel · {{ backend }}</div><a class="btn ghost" href="/logout">退出</a></div>
+<body class="theme-{{ theme }}"><div class="top"><div class="brand">IP Forward Panel · {{ backend }}</div><a class="btn ghost" href="/logout">退出</a></div>
 <main class="wrap"><h1 style="margin:0">流量中转管理面板</h1>{% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
 <section class="metrics"><div class="metric"><div class="muted">总规则</div><div class="num">{{ rules|length }}</div></div>
 <div class="metric"><div class="muted">TCP</div><div class="num">{{ tcp_count }}</div></div><div class="metric"><div class="muted">UDP</div><div class="num">{{ udp_count }}</div></div></section>
+{% if theme == "map" %}<section class="topology">{% for r in rules[:3] %}<div class="route"><div class="node"><b>Listen</b><br>{{ r.local_port }}</div><div class="line"></div><div class="node"><b>{{ r.protocol }}</b><br>{{ r.remark or "Forward rule" }}</div><div class="line"></div><div class="node"><b>Target</b><br>{{ r.target_ip }}:{{ r.target_port }}</div></div>{% else %}<div class="route"><div class="node"><b>Listen</b><br>Local port</div><div class="line"></div><div class="node"><b>Rule</b><br>TCP / UDP</div><div class="line"></div><div class="node"><b>Target</b><br>Remote service</div></div>{% endfor %}</section>{% else %}<section class="glass-rail"><div class="glass-item"><span class="muted">Style</span><br><b>Glass Panel C</b></div><div class="glass-item"><span class="muted">Traffic</span><br><b>Upload + Download</b></div><div class="glass-item"><span class="muted">Time</span><br><b>UTC+8</b></div></section>{% endif %}
 <section class="card"><div class="head">新增端口转发</div><div class="body"><form method="post" action="/add" class="grid">
 <div><label>协议</label><select name="protocol"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="all">TCP + UDP</option></select></div>
 <div><label>监听端口</label><input name="local_port" type="number" min="1" max="65535" required></div>
@@ -469,6 +485,7 @@ def index():
         PAGE,
         rules=rules,
         backend=args.backend,
+        theme=PANEL_THEME,
         tcp_count=sum(1 for r in rules if r["protocol"] == "TCP"),
         udp_count=sum(1 for r in rules if r["protocol"] == "UDP"),
         msg=request.args.get("msg", ""),
@@ -545,6 +562,7 @@ struct Config {
     user: String,
     password: String,
     backend: String,
+    theme: String,
     token: String,
 }
 
@@ -1052,14 +1070,20 @@ fn page(config: &Config, msg: &str) -> String {
         rows.push_str("<tr><td colspan=\"7\" style=\"text-align:center;color:#6b7685;padding:34px\">当前没有规则</td></tr>");
     }
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Forward Panel</title>{}</head><body><div class=\"top\"><div class=\"brand\">IP Forward Panel · {}</div><a class=\"btn ghost\" href=\"/logout\">退出</a></div><main class=\"wrap\"><h1 style=\"margin:0\">流量中转管理面板</h1>{}<section class=\"metrics\"><div class=\"metric\"><div class=\"muted\">总规则</div><div class=\"num\">{}</div></div><div class=\"metric\"><div class=\"muted\">TCP</div><div class=\"num\">{}</div></div><div class=\"metric\"><div class=\"muted\">UDP</div><div class=\"num\">{}</div></div></section><section class=\"card\"><div class=\"head\">新增端口转发</div><div class=\"body\"><form method=\"post\" action=\"/add\" class=\"grid\"><div><label>协议</label><select name=\"protocol\"><option value=\"tcp\">TCP</option><option value=\"udp\">UDP</option><option value=\"all\">TCP + UDP</option></select></div><div><label>监听端口</label><input name=\"local_port\" type=\"number\" min=\"1\" max=\"65535\" required></div><div><label>目标 IP / 域名</label><input name=\"target_ip\" required></div><div><label>目标端口</label><input name=\"target_port\" type=\"number\" min=\"1\" max=\"65535\" required></div><div><label>备注</label><input name=\"remark\"></div><div><label>流量上限 MB</label><input name=\"quota_mb\" type=\"number\" min=\"1\"></div><div><label>到期时间 UTC+8</label><input name=\"expires_at\" type=\"datetime-local\"></div><div style=\"grid-column:1/-1\"><button class=\"primary\" style=\"width:100%\">添加规则</button></div></form></div></section><section class=\"card\"><div class=\"head\">当前规则</div><div style=\"overflow:auto\"><table><thead><tr><th>协议</th><th>监听</th><th>转发至</th><th>备注</th><th>流量<br><small>上行 + 下行总和</small></th><th>到期时间</th><th style=\"text-align:right\">操作</th></tr></thead><tbody>{}</tbody></table></div></section></main></body></html>",
-        style(), html_escape(&config.backend), if msg.is_empty() { String::new() } else { format!("<div class=\"msg\">{}</div>", html_escape(msg)) },
-        rules.len(), tcp_count, udp_count, rows
+        "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Forward Panel</title>{}</head><body class=\"theme-{}\"><div class=\"top\"><div class=\"brand\">IP Forward Panel · {}</div><a class=\"btn ghost\" href=\"/logout\">退出</a></div><main class=\"wrap\"><h1 style=\"margin:0\">流量中转管理面板</h1>{}<section class=\"metrics\"><div class=\"metric\"><div class=\"muted\">总规则</div><div class=\"num\">{}</div></div><div class=\"metric\"><div class=\"muted\">TCP</div><div class=\"num\">{}</div></div><div class=\"metric\"><div class=\"muted\">UDP</div><div class=\"num\">{}</div></div></section><section class=\"theme-note\"><b>{}</b><span>{}</span></section><section class=\"card\"><div class=\"head\">新增端口转发</div><div class=\"body\"><form method=\"post\" action=\"/add\" class=\"grid\"><div><label>协议</label><select name=\"protocol\"><option value=\"tcp\">TCP</option><option value=\"udp\">UDP</option><option value=\"all\">TCP + UDP</option></select></div><div><label>监听端口</label><input name=\"local_port\" type=\"number\" min=\"1\" max=\"65535\" required></div><div><label>目标 IP / 域名</label><input name=\"target_ip\" required></div><div><label>目标端口</label><input name=\"target_port\" type=\"number\" min=\"1\" max=\"65535\" required></div><div><label>备注</label><input name=\"remark\"></div><div><label>流量上限 MB</label><input name=\"quota_mb\" type=\"number\" min=\"1\"></div><div><label>到期时间 UTC+8</label><input name=\"expires_at\" type=\"datetime-local\"></div><div style=\"grid-column:1/-1\"><button class=\"primary\" style=\"width:100%\">添加规则</button></div></form></div></section><section class=\"card\"><div class=\"head\">当前规则</div><div style=\"overflow:auto\"><table><thead><tr><th>协议</th><th>监听</th><th>转发至</th><th>备注</th><th>流量<br><small>上行 + 下行总和</small></th><th>到期时间</th><th style=\"text-align:right\">操作</th></tr></thead><tbody>{}</tbody></table></div></section></main></body></html>",
+        style(),
+        html_escape(&config.theme),
+        html_escape(&config.backend),
+        if msg.is_empty() { String::new() } else { format!("<div class=\"msg\">{}</div>", html_escape(msg)) },
+        rules.len(), tcp_count, udp_count,
+        if config.theme == "glass" { "Glass Panel C" } else { "Network Map A" },
+        if config.theme == "glass" { "Glass layout with traffic quota and UTC+8 expiration." } else { "Network map layout from listen port to target service." },
+        rows
     )
 }
 
 fn style() -> &'static str {
-    "<style>body{margin:0;background:#f4f6f8;color:#172033;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.top{height:64px;border-bottom:1px solid #d9e0e8;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 22px}.brand{font-weight:800}.wrap{max-width:1120px;margin:0 auto;padding:26px 18px 44px}.card{background:#fff;border:1px solid #d9e0e8;border-radius:8px;box-shadow:0 10px 26px rgba(23,32,51,.06);margin-top:18px;overflow:hidden}.head{padding:16px 18px;border-bottom:1px solid #d9e0e8;background:#fbfcfe;font-weight:750}.body{padding:18px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}label{display:block;color:#6b7685;font-weight:700;font-size:.86rem;margin-bottom:6px}input,select{width:100%;min-height:42px;border:1px solid #d9e0e8;border-radius:8px;padding:8px 10px;color:#172033}button,.btn{border:0;border-radius:8px;padding:10px 14px;font-weight:750;text-decoration:none;display:inline-block}.primary{background:#2563eb;color:#fff}.danger{background:#dc2626;color:#fff}.ghost{border:1px solid #d9e0e8;background:#fff;color:#172033}table{width:100%;border-collapse:collapse}th{background:#f7f9fb;color:#6b7685;text-align:left;font-size:.82rem;text-transform:uppercase}th,td{padding:13px 16px;border-bottom:1px solid #edf1f5}.pill{display:inline-block;border-radius:6px;padding:5px 8px;background:#111827;color:#fff;font-weight:750}.tcp{background:#2563eb}.udp{background:#7c3aed}.msg{padding:12px 14px;border-radius:8px;background:#eef6ff;color:#1d4ed8;margin-top:16px}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}.metric{background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:16px 18px}.num{font-size:1.8rem;font-weight:850}.muted{color:#6b7685}.login{min-height:calc(100vh - 65px);display:grid;place-items:center;padding:18px}.login-card{width:min(100%,420px);background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:28px;box-shadow:0 10px 26px rgba(23,32,51,.06)}@media(max-width:850px){.grid,.metrics{grid-template-columns:1fr}.top{padding:0 14px}.wrap{padding:20px 14px 34px}table{min-width:760px}}</style>"
+    "<style>body{margin:0;background:#f4f6f8;color:#172033;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif}.top{height:64px;border-bottom:1px solid #d9e0e8;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 22px}.brand{font-weight:800}.wrap{max-width:1120px;margin:0 auto;padding:26px 18px 44px}.card{background:#fff;border:1px solid #d9e0e8;border-radius:8px;box-shadow:0 10px 26px rgba(23,32,51,.06);margin-top:18px;overflow:hidden}.head{padding:16px 18px;border-bottom:1px solid #d9e0e8;background:#fbfcfe;font-weight:750}.body{padding:18px}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}label{display:block;color:#6b7685;font-weight:700;font-size:.86rem;margin-bottom:6px}input,select{width:100%;min-height:42px;border:1px solid #d9e0e8;border-radius:8px;padding:8px 10px;color:#172033}button,.btn{border:0;border-radius:8px;padding:10px 14px;font-weight:750;text-decoration:none;display:inline-block}.primary{background:#2563eb;color:#fff}.danger{background:#dc2626;color:#fff}.ghost{border:1px solid #d9e0e8;background:#fff;color:#172033}table{width:100%;border-collapse:collapse}th{background:#f7f9fb;color:#6b7685;text-align:left;font-size:.82rem;text-transform:uppercase}th,td{padding:13px 16px;border-bottom:1px solid #edf1f5}.pill{display:inline-block;border-radius:6px;padding:5px 8px;background:#111827;color:#fff;font-weight:750}.tcp{background:#2563eb}.udp{background:#7c3aed}.msg{padding:12px 14px;border-radius:8px;background:#eef6ff;color:#1d4ed8;margin-top:16px}.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}.metric{background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:16px 18px}.num{font-size:1.8rem;font-weight:850}.muted{color:#6b7685}.theme-note{margin-top:18px;border:1px solid #d9e0e8;border-radius:8px;background:#fff;padding:14px 16px;display:flex;justify-content:space-between;gap:12px}.theme-map{background:#f2f7fb}.theme-map .brand:after{content:'A';margin-left:8px;color:#0f766e}.theme-glass{background:linear-gradient(135deg,#eef4f7,#f8fbfc 48%,#e9f3f1)}.theme-glass .top,.theme-glass .card,.theme-glass .metric,.theme-glass .theme-note{background:rgba(255,255,255,.68);border-color:rgba(148,163,184,.34);box-shadow:0 18px 44px rgba(40,63,90,.12);backdrop-filter:blur(18px)}.theme-glass .brand:after{content:'C';margin-left:8px;color:#3157d5}.login{min-height:calc(100vh - 65px);display:grid;place-items:center;padding:18px}.login-card{width:min(100%,420px);background:#fff;border:1px solid #d9e0e8;border-radius:8px;padding:28px;box-shadow:0 10px 26px rgba(23,32,51,.06)}@media(max-width:850px){.grid,.metrics{grid-template-columns:1fr}.top{padding:0 14px}.wrap{padding:20px 14px 34px}table{min-width:760px}.theme-note{display:block}}</style>"
 }
 
 fn login_page(error: &str) -> String {
@@ -1224,9 +1248,11 @@ fn main() {
     let user = arg_value(&args, "--user", "admin");
     let password = arg_value(&args, "--password", "123456");
     let backend = arg_value(&args, "--backend", "iptables");
+    let theme_raw = arg_value(&args, "--theme", "map");
+    let theme = if theme_raw == "glass" { "glass".to_string() } else { "map".to_string() };
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
     let token = format!("{}-{}", std::process::id(), now);
-    let config = Config { port, user, password, backend, token };
+    let config = Config { port, user, password, backend, theme, token };
 
     shell_ok("sysctl", &["-w", "net.ipv4.ip_forward=1"]);
     if config.backend == "nftables" {
@@ -1248,9 +1274,9 @@ RSEOF
 
 write_service() {
   if [ "$PANEL_RUNTIME" = "python" ]; then
-    EXEC_START="/usr/bin/python3 $INSTALL_DIR/panel.py --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --backend $FIREWALL_BACKEND"
+    EXEC_START="/usr/bin/python3 $INSTALL_DIR/panel.py --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --backend $FIREWALL_BACKEND --theme $PANEL_THEME"
   else
-    EXEC_START="$PANEL_BINARY --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --backend $FIREWALL_BACKEND"
+    EXEC_START="$PANEL_BINARY --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --backend $FIREWALL_BACKEND --theme $PANEL_THEME"
   fi
 
   cat << EOF > "$SERVICE_FILE"
@@ -1292,6 +1318,7 @@ systemctl restart iptables-panel
 echo "====================================================="
 echo "✅ 安装/升级成功"
 echo "组合: $PANEL_RUNTIME + $FIREWALL_BACKEND"
+echo "UI theme: $PANEL_THEME"
 echo "访问地址: http://你的服务器IP:$PANEL_PORT"
 echo "账号: $PANEL_USER"
 echo "密码: $PANEL_PASS"

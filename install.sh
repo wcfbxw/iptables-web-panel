@@ -138,6 +138,16 @@ read -p "👉 请设置管理员密码 [默认: 123456]: " PANEL_PASS
 PANEL_PASS=${PANEL_PASS:-123456}
 
 echo ""
+echo "请选择面板 UI 风格:"
+echo "1) 网络拓扑版 A：突出转发路径和规则关系"
+echo "2) 玻璃拟态版 C：更现代、更适合展示"
+read -p "👉 请选择 UI 风格 [默认: 1]: " PANEL_THEME_CHOICE
+case "${PANEL_THEME_CHOICE:-1}" in
+  2) PANEL_THEME="glass" ;;
+  *) PANEL_THEME="map" ;;
+esac
+
+echo ""
 echo "⏳ 正在安装依赖环境 (Python3 & Flask)..."
 apt-get update -y > /dev/null 2>&1
 apt-get install -y python3 python3-pip iptables > /dev/null 2>&1
@@ -155,9 +165,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=5000)
 parser.add_argument('--user', type=str, default='admin')
 parser.add_argument('--password', type=str, default='123456')
+parser.add_argument('--theme', type=str, default='map')
 args = parser.parse_args()
 
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
+PANEL_THEME = args.theme if args.theme in ("map", "glass") else "map"
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 QUOTA_FILE = "/opt/iptables-panel/quotas.json"
@@ -458,9 +470,140 @@ HEADER_HTML = """
             .login-card { padding: 22px; }
             .panel-body { padding: 16px; }
         }
+        .theme-map {
+            --panel-bg: #f2f7fb;
+            --panel-primary: #0f766e;
+            --panel-primary-dark: #115e59;
+        }
+        .theme-map .page-title::after {
+            content: "A";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-left: 10px;
+            border-radius: 8px;
+            background: #ccfbf1;
+            color: #0f766e;
+            font-size: .88rem;
+            vertical-align: middle;
+        }
+        .theme-map .topology-board {
+            padding: 18px;
+            display: grid;
+            gap: 14px;
+        }
+        .theme-map .topology-row {
+            display: grid;
+            grid-template-columns: minmax(120px,1fr) 64px minmax(160px,1.25fr) 64px minmax(160px,1.25fr);
+            align-items: center;
+            gap: 10px;
+        }
+        .theme-map .node {
+            min-height: 76px;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: #fff;
+            padding: 13px 14px;
+            box-shadow: 0 10px 24px rgba(15, 118, 110, .07);
+        }
+        .theme-map .node-kicker {
+            color: var(--panel-muted);
+            font-size: .8rem;
+            font-weight: 750;
+            margin-bottom: 5px;
+        }
+        .theme-map .node-main {
+            font-weight: 850;
+            overflow-wrap: anywhere;
+        }
+        .theme-map .route-line {
+            height: 2px;
+            background: linear-gradient(90deg, #14b8a6, #2563eb);
+            position: relative;
+        }
+        .theme-map .route-line::after {
+            content: "";
+            position: absolute;
+            right: -1px;
+            top: -4px;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 8px solid #2563eb;
+        }
+        .theme-glass {
+            --panel-bg: #eef4f7;
+            --panel-surface: rgba(255,255,255,.72);
+            --panel-border: rgba(148,163,184,.35);
+            --panel-text: #102033;
+            --panel-muted: #526173;
+            --panel-primary: #3157d5;
+            --panel-primary-dark: #2442a8;
+            background: linear-gradient(135deg, #eef4f7 0%, #f8fbfc 46%, #e9f3f1 100%);
+        }
+        .theme-glass .topbar,
+        .theme-glass .metric,
+        .theme-glass .panel-card {
+            background: rgba(255,255,255,.68);
+            border-color: rgba(148,163,184,.34);
+            box-shadow: 0 18px 44px rgba(40, 63, 90, .12);
+            backdrop-filter: blur(18px);
+        }
+        .theme-glass .panel-header,
+        .theme-glass .table thead th {
+            background: rgba(255,255,255,.48);
+        }
+        .theme-glass .page-title::after {
+            content: "C";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            margin-left: 10px;
+            border-radius: 8px;
+            background: rgba(49,87,213,.12);
+            color: #3157d5;
+            font-size: .88rem;
+            vertical-align: middle;
+        }
+        .theme-glass .glass-rail {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .theme-glass .glass-item {
+            border: 1px solid rgba(148,163,184,.32);
+            border-radius: 8px;
+            padding: 14px 16px;
+            background: rgba(255,255,255,.52);
+        }
+        .theme-glass .glass-item strong {
+            display: block;
+            font-size: 1.05rem;
+        }
+        @media (max-width: 900px) {
+            .theme-map .topology-row,
+            .theme-glass .glass-rail { grid-template-columns: 1fr; }
+            .theme-map .route-line { height: 28px; width: 2px; margin-left: 18px; }
+            .theme-map .route-line::after {
+                right: auto;
+                top: auto;
+                left: -4px;
+                bottom: -1px;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 8px solid #2563eb;
+                border-bottom: 0;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="theme-{{ theme }}">
     <div class="topbar">
         <div class="topbar-inner">
             <div class="brand">
@@ -510,6 +653,37 @@ DASHBOARD_HTML = HEADER_HTML + """
             <div class="metric-value">{{ rules|selectattr('protocol', 'equalto', 'UDP')|list|length }}</div>
         </div>
     </div>
+
+    {% if theme == 'map' %}
+    <section class="panel-card">
+        <div class="panel-header">Network Map · A</div>
+        <div class="topology-board">
+            {% for rule in rules[:3] %}
+            <div class="topology-row">
+                <div class="node"><div class="node-kicker">Listen</div><div class="node-main">0.0.0.0 : {{ rule.local_port }}</div></div>
+                <div class="route-line"></div>
+                <div class="node"><div class="node-kicker">{{ rule.protocol }}</div><div class="node-main">{{ rule.remark or 'Forward rule' }}</div></div>
+                <div class="route-line"></div>
+                <div class="node"><div class="node-kicker">Target</div><div class="node-main">{{ rule.target_ip }} : {{ rule.target_port }}</div></div>
+            </div>
+            {% else %}
+            <div class="topology-row">
+                <div class="node"><div class="node-kicker">Listen</div><div class="node-main">Local port</div></div>
+                <div class="route-line"></div>
+                <div class="node"><div class="node-kicker">Rule</div><div class="node-main">TCP / UDP forwarding</div></div>
+                <div class="route-line"></div>
+                <div class="node"><div class="node-kicker">Target</div><div class="node-main">Remote service</div></div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <section class="glass-rail" aria-label="Theme C">
+        <div class="glass-item"><span class="text-muted">Style</span><strong>Glass Panel · C</strong></div>
+        <div class="glass-item"><span class="text-muted">Quota</span><strong>{{ t.traffic_note }}</strong></div>
+        <div class="glass-item"><span class="text-muted">Time</span><strong>{{ t.expires_ph }}</strong></div>
+    </section>
+    {% endif %}
     
     <section class="panel-card">
         <div class="panel-header">{{ t.add_rule }}</div>
@@ -768,8 +942,8 @@ def login():
     if request.method == 'POST':
         if request.form.get('username') == ADMIN_USER and request.form.get('password') == ADMIN_PASS:
             session['logged_in'] = True; return redirect(url_for('index'))
-        return render_template_string(LOGIN_HTML, t=t, error=t['login_error'])
-    return render_template_string(LOGIN_HTML, t=t)
+        return render_template_string(LOGIN_HTML, t=t, theme=PANEL_THEME, error=t['login_error'])
+    return render_template_string(LOGIN_HTML, t=t, theme=PANEL_THEME)
 
 @app.route('/logout')
 def logout(): session.pop('logged_in', None); return redirect(url_for('login'))
@@ -777,7 +951,7 @@ def logout(): session.pop('logged_in', None); return redirect(url_for('login'))
 @app.route('/', methods=['GET'])
 def index():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    return render_template_string(DASHBOARD_HTML, t=get_t(), rules=get_parsed_rules(), message=request.args.get('msg'), status=request.args.get('status', 'success'))
+    return render_template_string(DASHBOARD_HTML, t=get_t(), theme=PANEL_THEME, rules=get_parsed_rules(), message=request.args.get('msg'), status=request.args.get('status', 'success'))
 
 @app.route('/add', methods=['POST'])
 def add_rule():
@@ -858,7 +1032,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/python3 $INSTALL_DIR/panel.py --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS
+ExecStart=/usr/bin/python3 $INSTALL_DIR/panel.py --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --theme $PANEL_THEME
 Restart=always
 RestartSec=3
 
@@ -870,6 +1044,7 @@ systemctl daemon-reload
 systemctl enable iptables-panel > /dev/null 2>&1
 systemctl restart iptables-panel
 
+echo "UI theme: $PANEL_THEME"
 echo "====================================================="
 echo "✅ 安装/更新成功！面板已在后台运行并设置开机自启。"
 echo "🌐 访问地址: http://你的服务器IP:$PANEL_PORT"
