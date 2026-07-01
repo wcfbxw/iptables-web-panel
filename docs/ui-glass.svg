@@ -1,43 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-label="Glass UI preview">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-label="Liquid Glass UI preview">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#eef4f7"/>
-      <stop offset="0.52" stop-color="#f8fbfc"/>
-      <stop offset="1" stop-color="#e9f3f1"/>
+      <stop offset="0" stop-color="#dff7ff"/>
+      <stop offset="0.38" stop-color="#f7fbff"/>
+      <stop offset="0.72" stop-color="#d8f3ee"/>
+      <stop offset="1" stop-color="#f4e9ff"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".72"/>
+      <stop offset=".44" stop-color="#ffffff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".58"/>
     </linearGradient>
     <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#283f5a" flood-opacity=".14"/>
     </filter>
   </defs>
   <rect width="960" height="560" fill="url(#bg)"/>
-  <rect x="40" y="34" width="880" height="58" rx="8" fill="#ffffff" fill-opacity=".72" stroke="#cbd5e1" filter="url(#soft)"/>
+  <path d="M0 80 C180 20 300 132 470 74 C650 14 770 44 960 10 L960 0 L0 0 Z" fill="#ffffff" opacity=".38"/>
+  <path d="M0 330 C210 250 360 390 540 304 C700 228 790 278 960 214 L960 560 L0 560 Z" fill="#67e8f9" opacity=".13"/>
+  <path d="M120 0 L330 560" stroke="#ffffff" stroke-width="30" opacity=".2"/>
+  <path d="M610 0 L820 560" stroke="#c4b5fd" stroke-width="34" opacity=".16"/>
+  <rect x="40" y="34" width="880" height="58" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".7" filter="url(#soft)"/>
+  <line x1="58" y1="45" x2="900" y2="45" stroke="#ffffff" stroke-opacity=".78"/>
   <rect x="64" y="50" width="38" height="28" rx="8" fill="#3157d5"/>
   <text x="76" y="69" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="700">IP</text>
   <text x="118" y="69" fill="#102033" font-family="Arial, sans-serif" font-size="18" font-weight="700">Traffic Forwarding Panel</text>
-  <rect x="764" y="49" width="128" height="28" rx="8" fill="#ffffff" fill-opacity=".65" stroke="#cbd5e1"/>
-  <text x="802" y="68" fill="#3157d5" font-family="Arial, sans-serif" font-size="14" font-weight="700">Glass C</text>
-  <text x="64" y="145" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="800">Glass Control View</text>
+  <rect x="738" y="49" width="154" height="28" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".7"/>
+  <text x="760" y="68" fill="#3157d5" font-family="Arial, sans-serif" font-size="14" font-weight="700">Liquid Glass C</text>
+  <text x="64" y="145" fill="#102033" font-family="Arial, sans-serif" font-size="34" font-weight="800">Liquid Glass View</text>
   <g font-family="Arial, sans-serif" filter="url(#soft)">
-    <rect x="64" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <rect x="64" y="184" width="250" height="82" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".72"/>
+    <line x1="84" y1="196" x2="292" y2="196" stroke="#ffffff" stroke-opacity=".78"/>
     <text x="84" y="216" fill="#526173" font-size="13" font-weight="700">Total Rules</text>
     <text x="84" y="251" fill="#102033" font-size="33" font-weight="800">12</text>
-    <rect x="354" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <rect x="354" y="184" width="250" height="82" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".72"/>
+    <line x1="374" y1="196" x2="582" y2="196" stroke="#ffffff" stroke-opacity=".78"/>
     <text x="374" y="216" fill="#526173" font-size="13" font-weight="700">Traffic</text>
     <text x="374" y="251" fill="#102033" font-size="26" font-weight="800">8.4 GB / 20 GB</text>
-    <rect x="644" y="184" width="250" height="82" rx="8" fill="#ffffff" fill-opacity=".70" stroke="#cbd5e1"/>
+    <rect x="644" y="184" width="250" height="82" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".72"/>
+    <line x1="664" y1="196" x2="872" y2="196" stroke="#ffffff" stroke-opacity=".78"/>
     <text x="664" y="216" fill="#526173" font-size="13" font-weight="700">Time</text>
     <text x="664" y="251" fill="#102033" font-size="26" font-weight="800">UTC+8</text>
   </g>
-  <rect x="64" y="296" width="832" height="176" rx="8" fill="#ffffff" fill-opacity=".68" stroke="#cbd5e1" filter="url(#soft)"/>
+  <rect x="64" y="296" width="832" height="176" rx="8" fill="url(#liquid)" stroke="#ffffff" stroke-opacity=".72" filter="url(#soft)"/>
+  <line x1="88" y1="310" x2="872" y2="310" stroke="#ffffff" stroke-opacity=".78"/>
   <text x="90" y="332" fill="#102033" font-family="Arial, sans-serif" font-size="18" font-weight="800">Active Rules</text>
   <g font-family="Arial, sans-serif">
-    <rect x="90" y="356" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".56" stroke="#d9e0e8"/>
+    <rect x="90" y="356" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".48" stroke="#ffffff" stroke-opacity=".72"/>
     <rect x="110" y="366" width="44" height="20" rx="6" fill="#3157d5"/>
     <text x="121" y="381" fill="#ffffff" font-size="12" font-weight="800">TCP</text>
     <text x="178" y="381" fill="#102033" font-size="15" font-weight="700">443 → 10.0.0.8:8443</text>
     <text x="442" y="381" fill="#526173" font-size="14">8.4 GB / 20 GB</text>
     <text x="650" y="381" fill="#526173" font-size="14">2026-07-30 23:59 UTC+8</text>
-    <rect x="90" y="412" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".56" stroke="#d9e0e8"/>
+    <rect x="90" y="412" width="780" height="38" rx="8" fill="#ffffff" fill-opacity=".48" stroke="#ffffff" stroke-opacity=".72"/>
     <rect x="110" y="422" width="44" height="20" rx="6" fill="#0f766e"/>
     <text x="119" y="437" fill="#ffffff" font-size="12" font-weight="800">UDP</text>
     <text x="178" y="437" fill="#102033" font-size="15" font-weight="700">8443 → game.example.com:443</text>

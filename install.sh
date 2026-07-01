@@ -137,15 +137,7 @@ PANEL_USER=${PANEL_USER:-admin}
 read -p "👉 请设置管理员密码 [默认: 123456]: " PANEL_PASS
 PANEL_PASS=${PANEL_PASS:-123456}
 
-echo ""
-echo "请选择面板 UI 风格:"
-echo "1) 网络拓扑版 A：突出转发路径和规则关系"
-echo "2) 玻璃拟态版 C：更现代、更适合展示"
-read -p "👉 请选择 UI 风格 [默认: 1]: " PANEL_THEME_CHOICE
-case "${PANEL_THEME_CHOICE:-1}" in
-  2) PANEL_THEME="glass" ;;
-  *) PANEL_THEME="map" ;;
-esac
+PANEL_THEME="glass"
 
 echo ""
 echo "⏳ 正在安装依赖环境 (Python3 & Flask)..."
@@ -169,7 +161,7 @@ parser.add_argument('--theme', type=str, default='map')
 args = parser.parse_args()
 
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
-PANEL_THEME = args.theme if args.theme in ("map", "glass") else "map"
+PANEL_THEME = "glass"
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 QUOTA_FILE = "/opt/iptables-panel/quotas.json"
@@ -470,91 +462,137 @@ HEADER_HTML = """
             .login-card { padding: 22px; }
             .panel-body { padding: 16px; }
         }
-        .theme-map {
-            --panel-bg: #f2f7fb;
-            --panel-primary: #0f766e;
-            --panel-primary-dark: #115e59;
-        }
-        .theme-map .page-title::after {
-            content: "A";
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            margin-left: 10px;
-            border-radius: 8px;
-            background: #ccfbf1;
-            color: #0f766e;
-            font-size: .88rem;
-            vertical-align: middle;
-        }
-        .theme-map .topology-board {
-            padding: 18px;
-            display: grid;
-            gap: 14px;
-        }
-        .theme-map .topology-row {
-            display: grid;
-            grid-template-columns: minmax(120px,1fr) 64px minmax(160px,1.25fr) 64px minmax(160px,1.25fr);
-            align-items: center;
-            gap: 10px;
-        }
-        .theme-map .node {
-            min-height: 76px;
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            background: #fff;
-            padding: 13px 14px;
-            box-shadow: 0 10px 24px rgba(15, 118, 110, .07);
-        }
-        .theme-map .node-kicker {
-            color: var(--panel-muted);
-            font-size: .8rem;
-            font-weight: 750;
-            margin-bottom: 5px;
-        }
-        .theme-map .node-main {
-            font-weight: 850;
-            overflow-wrap: anywhere;
-        }
-        .theme-map .route-line {
-            height: 2px;
-            background: linear-gradient(90deg, #14b8a6, #2563eb);
-            position: relative;
-        }
-        .theme-map .route-line::after {
-            content: "";
-            position: absolute;
-            right: -1px;
-            top: -4px;
-            width: 0;
-            height: 0;
-            border-top: 5px solid transparent;
-            border-bottom: 5px solid transparent;
-            border-left: 8px solid #2563eb;
-        }
         .theme-glass {
-            --panel-bg: #eef4f7;
-            --panel-surface: rgba(255,255,255,.72);
-            --panel-border: rgba(148,163,184,.35);
-            --panel-text: #102033;
+            --panel-bg: #edf8fb;
+            --panel-surface: rgba(255,255,255,.62);
+            --panel-border: rgba(255,255,255,.58);
+            --panel-text: #0b1b35;
             --panel-muted: #526173;
             --panel-primary: #3157d5;
             --panel-primary-dark: #2442a8;
-            background: linear-gradient(135deg, #eef4f7 0%, #f8fbfc 46%, #e9f3f1 100%);
+            background:
+                linear-gradient(120deg, rgba(255,255,255,.2) 0 8%, transparent 8% 26%, rgba(125,211,252,.18) 26% 34%, transparent 34% 62%, rgba(216,180,254,.16) 62% 70%, transparent 70%),
+                linear-gradient(150deg, #dff7ff 0%, #f7fbff 34%, #d8f3ee 67%, #f4e9ff 100%);
+            position: relative;
+            overflow-x: hidden;
+        }
+        .theme-glass::before {
+            content: "";
+            position: fixed;
+            inset: -18%;
+            pointer-events: none;
+            background:
+                linear-gradient(105deg, transparent 0 18%, rgba(255,255,255,.62) 19%, transparent 25% 48%, rgba(103,232,249,.22) 52%, transparent 59% 100%),
+                linear-gradient(62deg, transparent 0 24%, rgba(196,181,253,.24) 28%, transparent 36% 70%, rgba(255,255,255,.42) 74%, transparent 82%);
+            filter: blur(22px) saturate(1.25);
+            transform: rotate(-6deg);
+            opacity: .88;
+            z-index: 0;
+        }
+        .theme-glass::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,.22) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.16) 1px, transparent 1px);
+            background-size: 78px 78px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,.42), transparent 72%);
+            opacity: .34;
+            z-index: 0;
+        }
+        .theme-glass .topbar,
+        .theme-glass .page-shell,
+        .theme-glass .login-shell {
+            position: relative;
+            z-index: 1;
         }
         .theme-glass .topbar,
         .theme-glass .metric,
-        .theme-glass .panel-card {
-            background: rgba(255,255,255,.68);
-            border-color: rgba(148,163,184,.34);
-            box-shadow: 0 18px 44px rgba(40, 63, 90, .12);
-            backdrop-filter: blur(18px);
+        .theme-glass .panel-card,
+        .theme-glass .login-card,
+        .theme-glass .glass-item {
+            position: relative;
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.3) 42%, rgba(255,255,255,.55)),
+                linear-gradient(120deg, rgba(125,211,252,.16), rgba(216,180,254,.14));
+            border-color: rgba(255,255,255,.62);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.92),
+                inset 0 -20px 44px rgba(255,255,255,.24),
+                0 24px 64px rgba(54, 78, 112, .18);
+            backdrop-filter: blur(28px) saturate(1.65);
+        }
+        .theme-glass .topbar::before,
+        .theme-glass .metric::before,
+        .theme-glass .panel-card::before,
+        .theme-glass .login-card::before,
+        .theme-glass .glass-item::before {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            pointer-events: none;
+            border-radius: inherit;
+            background:
+                linear-gradient(120deg, rgba(255,255,255,.82), transparent 24% 64%, rgba(255,255,255,.42)),
+                linear-gradient(180deg, rgba(255,255,255,.22), transparent 46%);
+            opacity: .7;
+            mix-blend-mode: screen;
+        }
+        .theme-glass .topbar::after,
+        .theme-glass .metric::after,
+        .theme-glass .panel-card::after,
+        .theme-glass .login-card::after,
+        .theme-glass .glass-item::after {
+            content: "";
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            top: 10px;
+            height: 1px;
+            pointer-events: none;
+            border-radius: 999px;
+            background: rgba(255,255,255,.9);
+            box-shadow: 0 12px 28px rgba(255,255,255,.42);
+        }
+        .theme-glass .topbar > *,
+        .theme-glass .metric > *,
+        .theme-glass .panel-card > *,
+        .theme-glass .login-card > *,
+        .theme-glass .glass-item > * {
+            position: relative;
+            z-index: 1;
         }
         .theme-glass .panel-header,
         .theme-glass .table thead th {
-            background: rgba(255,255,255,.48);
+            background: rgba(255,255,255,.34);
+            border-color: rgba(255,255,255,.46);
+        }
+        .theme-glass .table td,
+        .theme-glass .table th {
+            border-color: rgba(255,255,255,.42);
+        }
+        .theme-glass .form-control,
+        .theme-glass .form-select {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.38));
+            border-color: rgba(255,255,255,.68);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.88),
+                inset 0 0 18px rgba(255,255,255,.32),
+                0 10px 24px rgba(54,78,112,.12);
+            backdrop-filter: blur(18px) saturate(1.45);
+        }
+        .theme-glass .btn-primary {
+            background:
+                linear-gradient(135deg, rgba(49,87,213,.92), rgba(103,232,249,.72)),
+                linear-gradient(120deg, rgba(255,255,255,.32), transparent);
+            border-color: rgba(255,255,255,.58);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,.62),
+                inset 0 -14px 26px rgba(11,27,53,.12),
+                0 16px 34px rgba(49,87,213,.24);
         }
         .theme-glass .page-title::after {
             content: "C";
@@ -577,29 +615,16 @@ HEADER_HTML = """
             margin-bottom: 18px;
         }
         .theme-glass .glass-item {
-            border: 1px solid rgba(148,163,184,.32);
+            border: 1px solid rgba(255,255,255,.62);
             border-radius: 8px;
             padding: 14px 16px;
-            background: rgba(255,255,255,.52);
         }
         .theme-glass .glass-item strong {
             display: block;
             font-size: 1.05rem;
         }
         @media (max-width: 900px) {
-            .theme-map .topology-row,
             .theme-glass .glass-rail { grid-template-columns: 1fr; }
-            .theme-map .route-line { height: 28px; width: 2px; margin-left: 18px; }
-            .theme-map .route-line::after {
-                right: auto;
-                top: auto;
-                left: -4px;
-                bottom: -1px;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 8px solid #2563eb;
-                border-bottom: 0;
-            }
         }
     </style>
 </head>
@@ -654,36 +679,11 @@ DASHBOARD_HTML = HEADER_HTML + """
         </div>
     </div>
 
-    {% if theme == 'map' %}
-    <section class="panel-card">
-        <div class="panel-header">Network Map · A</div>
-        <div class="topology-board">
-            {% for rule in rules[:3] %}
-            <div class="topology-row">
-                <div class="node"><div class="node-kicker">Listen</div><div class="node-main">0.0.0.0 : {{ rule.local_port }}</div></div>
-                <div class="route-line"></div>
-                <div class="node"><div class="node-kicker">{{ rule.protocol }}</div><div class="node-main">{{ rule.remark or 'Forward rule' }}</div></div>
-                <div class="route-line"></div>
-                <div class="node"><div class="node-kicker">Target</div><div class="node-main">{{ rule.target_ip }} : {{ rule.target_port }}</div></div>
-            </div>
-            {% else %}
-            <div class="topology-row">
-                <div class="node"><div class="node-kicker">Listen</div><div class="node-main">Local port</div></div>
-                <div class="route-line"></div>
-                <div class="node"><div class="node-kicker">Rule</div><div class="node-main">TCP / UDP forwarding</div></div>
-                <div class="route-line"></div>
-                <div class="node"><div class="node-kicker">Target</div><div class="node-main">Remote service</div></div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-    {% else %}
     <section class="glass-rail" aria-label="Theme C">
-        <div class="glass-item"><span class="text-muted">Style</span><strong>Glass Panel · C</strong></div>
+        <div class="glass-item"><span class="text-muted">Style</span><strong>Liquid Glass · C</strong></div>
         <div class="glass-item"><span class="text-muted">Quota</span><strong>{{ t.traffic_note }}</strong></div>
         <div class="glass-item"><span class="text-muted">Time</span><strong>{{ t.expires_ph }}</strong></div>
     </section>
-    {% endif %}
     
     <section class="panel-card">
         <div class="panel-header">{{ t.add_rule }}</div>
