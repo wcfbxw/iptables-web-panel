@@ -181,7 +181,7 @@ T = {
         'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是 1-65535 之间的数字！',
         'err_ip': '无效的 IP 地址或域名解析失败！', 'err_duplicate': '规则已存在，无需重复添加。',
         'add_success': '添加成功！', 'del_success': '删除成功',
-        'login_error': '用户名或密码错误', 'overview': '运行概览', 'total_rules': '总规则',
+        'login_error': '用户名或密码错误', 'overview': '运行概览', 'total_rules': '总规则', 'total_traffic': '总流量',
         'tcp_rules': 'TCP 规则', 'udp_rules': 'UDP 规则', 'traffic': '流量',
         'quota': '流量上限', 'quota_ph': '选填，单位 MB', 'quota_reached': '流量已达上限，规则已自动停用。',
         'err_quota': '流量上限必须是数字，单位 MB。', 'unlimited': '不限',
@@ -200,7 +200,7 @@ T = {
         'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers between 1 and 65535!',
         'err_ip': 'Invalid IP or Domain resolution failed!', 'err_duplicate': 'Rule already exists. No duplicate was added.',
         'add_success': 'Added successfully!', 'del_success': 'Deleted',
-        'login_error': 'Invalid username or password', 'overview': 'Overview', 'total_rules': 'Total Rules',
+        'login_error': 'Invalid username or password', 'overview': 'Overview', 'total_rules': 'Total Rules', 'total_traffic': 'Total Traffic',
         'tcp_rules': 'TCP Rules', 'udp_rules': 'UDP Rules', 'traffic': 'Traffic',
         'quota': 'Traffic Limit', 'quota_ph': 'Optional, MB', 'quota_reached': 'Traffic limit reached. Rule was disabled.',
         'err_quota': 'Traffic limit must be a number in MB.', 'unlimited': 'Unlimited',
@@ -356,7 +356,7 @@ HEADER_HTML = """
         }
         .metric-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 14px;
             margin: 20px 0;
         }
@@ -670,6 +670,10 @@ DASHBOARD_HTML = HEADER_HTML + """
             <div class="metric-value">{{ rules|length }}</div>
         </div>
         <div class="metric">
+            <div class="metric-label">{{ t.total_traffic }}</div>
+            <div class="metric-value">{{ total_traffic_text }}</div>
+        </div>
+        <div class="metric">
             <div class="metric-label">{{ t.tcp_rules }}</div>
             <div class="metric-value">{{ rules|selectattr('protocol', 'equalto', 'TCP')|list|length }}</div>
         </div>
@@ -951,7 +955,9 @@ def logout(): session.pop('logged_in', None); return redirect(url_for('login'))
 @app.route('/', methods=['GET'])
 def index():
     if not session.get('logged_in'): return redirect(url_for('login'))
-    return render_template_string(DASHBOARD_HTML, t=get_t(), theme=PANEL_THEME, rules=get_parsed_rules(), message=request.args.get('msg'), status=request.args.get('status', 'success'))
+    rules = get_parsed_rules()
+    total_traffic_text = format_bytes(sum(rule.get('traffic_bytes', 0) for rule in rules))
+    return render_template_string(DASHBOARD_HTML, t=get_t(), theme=PANEL_THEME, rules=rules, total_traffic_text=total_traffic_text, message=request.args.get('msg'), status=request.args.get('status', 'success'))
 
 @app.route('/add', methods=['POST'])
 def add_rule():
