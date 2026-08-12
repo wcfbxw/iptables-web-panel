@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iptables Panel UI Concepts</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --line: #dbe3ef;
+      --text: #111827;
+      --muted: #64748b;
+      --danger: #dc2626;
+      --green: #16a34a;
+      --violet: #7c3aed;
+      --bg: #eef2f6;
+      --surface: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #e8edf3;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    .chooser {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .chooser-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+    }
+    .chooser b {
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+    .chooser a {
+      flex: 0 0 auto;
+      color: #0f172a;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 750;
+      font-size: 14px;
+    }
+    .concept {
+      min-height: 100vh;
+      padding: 34px 20px 70px;
+      border-bottom: 8px solid #d8e0ea;
+    }
+    .concept-title {
+      max-width: 1320px;
+      margin: 0 auto 18px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .concept-title h2 {
+      margin: 0;
+      font-size: 28px;
+    }
+    .concept-title p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #e0edff;
+      color: #1d4ed8;
+      font-weight: 800;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 800;
+      background: var(--blue);
+      color: #fff;
+      white-space: nowrap;
+    }
+    .btn.secondary {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .btn.danger {
+      background: #fff;
+      color: var(--danger);
+      border: 1px solid #fecaca;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(15,23,42,.05);
+    }
+    .metric label {
+      display: block;
+      color: var(--muted);
+      font-weight: 850;
+      font-size: 13px;
+    }
+    .metric strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 30px;
+      line-height: 1;
+    }
+    .field label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      margin-bottom: 6px;
+    }
+    input, select {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: #111827;
+      padding: 0 11px;
+      font: inherit;
+      font-weight: 600;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 920px;
+    }
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      background: #f8fafc;
+      letter-spacing: 0;
+    }
+    th, td {
+      padding: 13px 14px;
+      border-bottom: 1px solid #e7edf5;
+      vertical-align: middle;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: #fff;
+      background: #111827;
+      font-weight: 850;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pill.tcp { background: var(--blue); }
+    .pill.udp { background: var(--violet); }
+    .muted { color: var(--muted); }
+    .progress {
+      width: 135px;
+      height: 7px;
+      background: #e5edf6;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress span {
+      display: block;
+      height: 100%;
+      background: var(--blue);
+      border-radius: 999px;
+    }
+
+    /* Concept 1 */
+    #concept-1 { background: #eef2f6; }
+    .ops-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+    .ops-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .ops-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .ops-logo {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 900;
+    }
+    .ops-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .ops-card {
+      margin-top: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 38px rgba(15,23,42,.06);
+      overflow: hidden;
+    }
+    .ops-card header {
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 18px;
+      font-weight: 900;
+      background: #fbfdff;
+    }
+    .ops-form {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1.4fr 1fr 1fr .9fr 1.1fr;
+      gap: 12px;
+      padding: 18px;
+      align-items: end;
+    }
+    .ops-form .wide { grid-column: 1 / -1; }
+    .ops-table-wrap { overflow: auto; }
+
+    /* Concept 2 */
+    #concept-2 {
+      background: #0b1120;
+      color: #e5edf8;
+    }
+    #concept-2 .concept-title p { color: #91a4bd; }
+    .dark-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      background: #111827;
+      border: 1px solid #243044;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.36);
+    }
+    .dark-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 20px;
+      border-bottom: 1px solid #243044;
+      background: #0f172a;
+    }
+    .dark-title {
+      font-size: 24px;
+      font-weight: 900;
+    }
+    .dark-body {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: 680px;
+    }
+    .dark-side {
+      border-right: 1px solid #243044;
+      padding: 18px;
+      background: #0b1220;
+    }
+    .dark-main { padding: 18px; }
+    #concept-2 .metric,
+    #concept-2 .panel {
+      background: #121c2f;
+      border-color: #243044;
+      box-shadow: none;
+    }
+    #concept-2 .metric label,
+    #concept-2 th,
+    #concept-2 .muted,
+    #concept-2 .field label { color: #91a4bd; }
+    #concept-2 input,
+    #concept-2 select {
+      background: #0b1220;
+      color: #e5edf8;
+      border-color: #334155;
+    }
+    #concept-2 table th { background: #0b1220; }
+    #concept-2 th,
+    #concept-2 td { border-color: #243044; }
+    .dark-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .dark-form {
+      display: grid;
+      gap: 12px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .panel h3 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 17px;
+    }
+    .panel .pad { padding: 16px; }
+
+    /* Concept 3 */
+    #concept-3 { background: #f3f6fb; }
+    .side-layout {
+      max-width: 1320px;
+      min-height: 720px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 245px minmax(0, 1fr);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 18px 44px rgba(15,23,42,.07);
+    }
+    .sidebar {
+      background: #0f172a;
+      color: #e5edf8;
+      padding: 18px;
+    }
+    .side-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 19px;
+      font-weight: 900;
+      margin-bottom: 28px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 42px;
+      color: #b8c5d8;
+      border-radius: 8px;
+      padding: 0 10px;
+      font-weight: 750;
+    }
+    .nav-item.active {
+      color: #fff;
+      background: #1d4ed8;
+    }
+    .side-content {
+      padding: 22px;
+      background: #f8fafc;
+    }
+    .side-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 16px;
+    }
+    .side-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .side-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    /* Concept 4 */
+    #concept-4 { background: #f7f8fb; }
+    .pro-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+    .pro-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 18px;
+      padding: 20px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .pro-header h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+    .pro-sub {
+      color: var(--muted);
+      font-weight: 650;
+      margin-top: 6px;
+    }
+    .pro-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .pro-content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+    .pro-form {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      padding: 16px;
+    }
+    .pro-form .span2 { grid-column: span 2; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    .search {
+      max-width: 300px;
+      height: 38px;
+    }
+
+    @media (max-width: 980px) {
+      .ops-grid,
+      .dark-metrics,
+      .side-metrics,
+      .pro-metrics { grid-template-columns: 1fr; }
+      .ops-form,
+      .pro-form { grid-template-columns: 1fr; }
+      .dark-body,
+      .side-layout,
+      .split { grid-template-columns: 1fr; }
+      .dark-side,
+      .sidebar { border-right: 0; }
+      .concept-title { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="chooser">
+    <div class="chooser-inner">
+      <b>选择预览</b>
+      <a href="#concept-1">方案 A：紧凑运维版</a>
+      <a href="#concept-2">方案 B：深色监控版</a>
+      <a href="#concept-3">方案 C：侧栏控制台版</a>
+      <a href="#concept-4">方案 D：浅色专业版</a>
+    </div>
+  </nav>
+
+  <section id="concept-1" class="concept">
+    <div class="concept-title">
+      <div>
+        <h2>方案 A：紧凑运维版</h2>
+        <p>保留你现在的横向结构，但压紧层级、增强表格扫描效率，适合 VPS 面板长期使用。</p>
+      </div>
+      <span class="tag">推荐：稳妥升级当前 UI</span>
+    </div>
+    <div class="ops-shell">
+      <div class="ops-top">
+        <div class="ops-brand"><span class="ops-logo">IP</span> 流量中转管理面板</div>
+        <div><button class="btn secondary">🌐 English</button> <button class="btn danger">安全退出</button></div>
+      </div>
+      <div class="ops-grid">
+        <div class="metric"><label>总规则</label><strong>2</strong></div>
+        <div class="metric"><label>TCP 规则</label><strong>1</strong></div>
+        <div class="metric"><label>UDP 规则</label><strong>1</strong></div>
+        <div class="metric"><label>本月流量</label><strong>8.4 GB</strong></div>
+      </div>
+      <div class="ops-card">
+        <header>新增端口转发</header>
+        <div class="ops-form">
+          <div class="field"><label>协议</label><select><option>TCP + UDP 双栈</option></select></div>
+          <div class="field"><label>监听端口</label><input value="38342"></div>
+          <div class="field"><label>目标 IP 或域名</label><input value="38.244.38.29"></div>
+          <div class="field"><label>目标端口</label><input value="16589"></div>
+          <div class="field"><label>备注</label><input value="Game relay"></div>
+          <div class="field"><label>流量上限</label><input value="10240 MB"></div>
+          <div class="field"><label>到期时间</label><input value="2026-07-08 18:30"></div>
+          <button class="btn wide">立即添加转发规则</button>
+        </div>
+      </div>
+      <div class="ops-card">
+        <header>当前生效规则</header>
+        <div class="ops-table-wrap">
+          <table>
+            <thead><tr><th>协议</th><th>监听端口</th><th>目标</th><th>备注</th><th>流量</th><th>到期</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td class="muted">Game relay</td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td>2026-07-08 18:30</td><td><button class="btn danger">删除</button></td></tr>
+              <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td class="muted">Game relay</td><td>1.9 GB / 不限<div class="progress"><span style="width:12%"></span></div></td><td>不限</td><td><button class="btn danger">删除</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="concept-2" class="concept">
+    <div class="concept-title">
+      <div>
+        <h2>方案 B：深色监控版</h2>
+        <p>更像状态监控台，夜间运维舒服，流量和规则状态更突出。</p>
+      </div>
+      <span class="tag">适合：监控感 / 酷一点</span>
+    </div>
+    <div class="dark-shell">
+      <div class="dark-top">
+        <div class="dark-title">🚀 Traffic Relay Console</div>
+        <div><button class="btn secondary">中文</button> <button class="btn danger">Logout</button></div>
+      </div>
+      <div class="dark-body">
+        <aside class="dark-side">
+          <div class="dark-metrics">
+            <div class="metric"><label>Total</label><strong>2</strong></div>
+            <div class="metric"><label>TCP</label><strong>1</strong></div>
+            <div class="metric"><label>UDP</label><strong>1</strong></div>
+          </div>
+          <div class="panel">
+            <h3>Add Rule</h3>
+            <div class="pad dark-form">
+              <div class="field"><label>Protocol</label><select><option>TCP + UDP</option></select></div>
+              <div class="field"><label>Listen Port</label><input value="38342"></div>
+              <div class="field"><label>Target</label><input value="38.244.38.29"></div>
+              <div class="field"><label>Target Port</label><input value="16589"></div>
+              <div class="field"><label>Quota</label><input value="10240 MB"></div>
+              <div class="field"><label>Expires</label><input value="2026-07-08 18:30"></div>
+              <button class="btn">Create Forwarding</button>
+            </div>
+          </div>
+        </aside>
+        <main class="dark-main">
+          <div class="panel">
+            <h3>Active Rules</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>Protocol</th><th>Port</th><th>Destination</th><th>Traffic</th><th>Expires</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td>2026-07-08 18:30</td><td><button class="btn danger">Delete</button></td></tr>
+                  <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>1.9 GB / Unlimited<div class="progress"><span style="width:12%"></span></div></td><td>Unlimited</td><td><button class="btn danger">Delete</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <section id="concept-3" class="concept">
+    <div class="concept-title">
+      <div>
+        <h2>方案 C：侧栏控制台版</h2>
+        <p>把添加规则放到右侧固定区域，列表留给主区域，适合规则很多时操作。</p>
+      </div>
+      <span class="tag">适合：后续功能继续增加</span>
+    </div>
+    <div class="side-layout">
+      <aside class="sidebar">
+        <div class="side-logo"><span class="ops-logo">IP</span> Relay Panel</div>
+        <div class="nav-item active">规则管理</div>
+        <div class="nav-item">流量统计</div>
+        <div class="nav-item">系统服务</div>
+        <div class="nav-item">语言设置</div>
+      </aside>
+      <main class="side-content">
+        <div class="side-header">
+          <div>
+            <h1 style="margin:0">流量中转管理面板</h1>
+            <div class="muted" style="font-weight:700;margin-top:6px">iptables / nftables forwarding workspace</div>
+          </div>
+          <button class="btn danger">安全退出</button>
+        </div>
+        <div class="side-metrics">
+          <div class="metric"><label>总规则</label><strong>2</strong></div>
+          <div class="metric"><label>已用流量</label><strong>5.1 GB</strong></div>
+          <div class="metric"><label>即将到期</label><strong>1</strong></div>
+        </div>
+        <div class="split">
+          <div class="panel">
+            <h3>当前生效规则</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>协议</th><th>监听</th><th>目标</th><th>流量</th><th>到期</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td>2026-07-08</td><td><button class="btn danger">删除</button></td></tr>
+                  <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>1.9 GB / 不限<div class="progress"><span style="width:12%"></span></div></td><td>不限</td><td><button class="btn danger">删除</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>新增转发</h3>
+            <div class="pad side-form">
+              <div class="field"><label>协议</label><select><option>TCP + UDP 双栈</option></select></div>
+              <div class="field"><label>监听端口</label><input></div>
+              <div class="field"><label>目标 IP 或域名</label><input></div>
+              <div class="field"><label>目标端口</label><input></div>
+              <div class="field"><label>流量上限</label><input placeholder="MB"></div>
+              <div class="field"><label>到期时间 UTC+8</label><input></div>
+              <button class="btn">添加规则</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section id="concept-4" class="concept">
+    <div class="concept-title">
+      <div>
+        <h2>方案 D：浅色专业版</h2>
+        <p>更克制、更像正式产品后台；顶部说明清楚，表格工具栏更适合查找和维护。</p>
+      </div>
+      <span class="tag">适合：最干净正式</span>
+    </div>
+    <div class="pro-shell">
+      <div class="pro-header">
+        <div>
+          <h1>Iptables / Nftables Web 流量中转管理面板</h1>
+          <div class="pro-sub">管理 TCP / UDP 端口转发、流量限制、UTC+8 到期时间和自动停用规则。</div>
+        </div>
+        <div><button class="btn secondary">🌐 English</button> <button class="btn danger">安全退出</button></div>
+      </div>
+      <div class="pro-metrics">
+        <div class="metric"><label>总规则</label><strong>2</strong></div>
+        <div class="metric"><label>TCP</label><strong>1</strong></div>
+        <div class="metric"><label>UDP</label><strong>1</strong></div>
+        <div class="metric"><label>总流量</label><strong>5.1 GB</strong></div>
+      </div>
+      <div class="pro-content">
+        <div class="panel">
+          <h3>新增端口转发</h3>
+          <div class="pro-form">
+            <div class="field"><label>协议</label><select><option>TCP + UDP 双栈</option></select></div>
+            <div class="field"><label>监听端口</label><input></div>
+            <div class="field span2"><label>目标 IP 或域名</label><input></div>
+            <div class="field"><label>目标端口</label><input></div>
+            <div class="field"><label>备注</label><input></div>
+            <div class="field"><label>流量上限</label><input placeholder="MB"></div>
+            <div class="field"><label>到期时间 UTC+8</label><input></div>
+            <button class="btn" style="grid-column:1/-1">立即添加转发规则</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="toolbar">
+            <h3 style="border:0;padding:0">当前生效规则</h3>
+            <input class="search" placeholder="搜索端口 / IP / 备注">
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>协议</th><th>监听端口</th><th>目标地址</th><th>备注</th><th>流量</th><th>到期时间</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td class="muted">Game relay</td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td>2026-07-08 18:30</td><td><button class="btn danger">删除</button></td></tr>
+                <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td class="muted">Game relay</td><td>1.9 GB / 不限<div class="progress"><span style="width:12%"></span></div></td><td>不限</td><td><button class="btn danger">删除</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

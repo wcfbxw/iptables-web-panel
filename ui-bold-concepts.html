@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bold UI Concepts - Traffic Relay Panel</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: #111827;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      background: #0b1020;
+    }
+    .jumpbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(9, 14, 29, .9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .jumpbar-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      align-items: center;
+    }
+    .jumpbar b {
+      color: #e5edff;
+      flex: 0 0 auto;
+      margin-right: 8px;
+    }
+    .jumpbar a {
+      color: #dbeafe;
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .concept {
+      min-height: 100vh;
+      padding: 36px 20px 78px;
+      border-bottom: 8px solid rgba(255,255,255,.1);
+    }
+    .intro {
+      max-width: 1440px;
+      margin: 0 auto 22px;
+      color: #e5edff;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-end;
+    }
+    .intro h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+    .intro p {
+      margin: 8px 0 0;
+      color: #aebdda;
+      font-weight: 650;
+      max-width: 780px;
+    }
+    .badge {
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: #dbeafe;
+      font-size: 13px;
+      font-weight: 850;
+      background: rgba(255,255,255,.07);
+      white-space: nowrap;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 850;
+      cursor: default;
+    }
+    input, select {
+      width: 100%;
+      height: 42px;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,.45);
+      padding: 0 11px;
+      font: inherit;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: inherit;
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .tcp { background: #2563eb; color: #fff; }
+    .udp { background: #7c3aed; color: #fff; }
+    .ok { background: #dcfce7; color: #166534; }
+    .warn { background: #fef3c7; color: #92400e; }
+    .danger { background: #fee2e2; color: #b91c1c; }
+    .progress {
+      height: 7px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(148,163,184,.25);
+      margin-top: 7px;
+    }
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: #2563eb;
+    }
+
+    /* B: Command Center */
+    #command {
+      background: #f3f4f8;
+      color: #111827;
+    }
+    #command .intro { color: #111827; }
+    #command .intro p { color: #64748b; }
+    #command .badge { color: #1d4ed8; background: #dbeafe; border-color: #bfdbfe; }
+    .command-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 780px;
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15,23,42,.08);
+    }
+    .command-nav {
+      padding: 22px;
+      background: #111827;
+      color: #e5edff;
+    }
+    .command-nav h3 {
+      margin: 0 0 24px;
+      font-size: 21px;
+    }
+    .nav {
+      height: 42px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      color: #b9c6da;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .nav.active { color: #fff; background: #2563eb; }
+    .command-main {
+      padding: 22px;
+      background: #f8fafc;
+    }
+    .command-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .command-top h1 { margin: 0; font-size: 30px; }
+    .command-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .white-card {
+      border: 1px solid #dbe3ef;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .white-card h3 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid #dbe3ef;
+    }
+    .white-card .pad { padding: 16px; }
+    .command-form {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+    .command-form .span2 { grid-column: span 2; }
+    .command-form button { background: #2563eb; color: #fff; }
+    .table-wrap { overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+    th, td {
+      padding: 13px 14px;
+      border-bottom: 1px solid #e7edf5;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      color: #64748b;
+      font-size: 12px;
+      text-transform: uppercase;
+      background: #f8fafc;
+    }
+    .metric-card {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .metric-card span {
+      color: #64748b;
+      font-weight: 850;
+      font-size: 12px;
+    }
+    .metric-card strong {
+      display: block;
+      margin-top: 7px;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    /* C: Liquid Glass */
+    #glass {
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.22) 0 8%, transparent 8% 26%, rgba(125,211,252,.18) 26% 34%, transparent 34% 62%, rgba(216,180,254,.18) 62% 70%, transparent 70%),
+        linear-gradient(150deg, #dff7ff 0%, #f7fbff 34%, #d8f3ee 67%, #f4e9ff 100%);
+      color: #0b1b35;
+      position: relative;
+      overflow: hidden;
+    }
+    #glass::before {
+      content: "";
+      position: absolute;
+      inset: -18%;
+      pointer-events: none;
+      background:
+        linear-gradient(105deg, transparent 0 18%, rgba(255,255,255,.65) 19%, transparent 25% 48%, rgba(103,232,249,.24) 52%, transparent 59% 100%),
+        linear-gradient(62deg, transparent 0 24%, rgba(196,181,253,.26) 28%, transparent 36% 70%, rgba(255,255,255,.45) 74%, transparent 82%);
+      filter: blur(22px) saturate(1.25);
+      transform: rotate(-6deg);
+      opacity: .9;
+    }
+    #glass::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.16) 1px, transparent 1px);
+      background-size: 78px 78px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.42), transparent 72%);
+      opacity: .36;
+    }
+    #glass .intro,
+    #glass .glass-shell {
+      position: relative;
+      z-index: 1;
+    }
+    #glass .intro {
+      color: #e5edff;
+    }
+    #glass .intro h2 { color: #0b1b35; }
+    #glass .intro p { color: #38506b; }
+    #glass .badge {
+      color: #17305d;
+      background: rgba(255,255,255,.42);
+      border: 1px solid rgba(255,255,255,.58);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.72), 0 16px 36px rgba(72,96,130,.16);
+      backdrop-filter: blur(18px) saturate(1.5);
+    }
+    .glass-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      min-height: 760px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 18px;
+    }
+    .glass-top,
+    .glass-card {
+      position: relative;
+      border: 1px solid rgba(255,255,255,.62);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.28) 42%, rgba(255,255,255,.55)),
+        linear-gradient(120deg, rgba(125,211,252,.18), rgba(216,180,254,.16));
+      backdrop-filter: blur(28px) saturate(1.65);
+      border-radius: 12px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.92),
+        inset 0 -22px 48px rgba(255,255,255,.28),
+        0 28px 80px rgba(54,78,112,.2);
+    }
+    .glass-top::before,
+    .glass-card::before,
+    .glass-stat::before {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      pointer-events: none;
+      border-radius: inherit;
+      background:
+        linear-gradient(120deg, rgba(255,255,255,.82), transparent 24% 64%, rgba(255,255,255,.42)),
+        linear-gradient(180deg, rgba(255,255,255,.22), transparent 46%);
+      opacity: .72;
+      mix-blend-mode: screen;
+    }
+    .glass-top::after,
+    .glass-card::after,
+    .glass-stat::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 12px;
+      height: 1px;
+      pointer-events: none;
+      border-radius: 999px;
+      background: rgba(255,255,255,.9);
+      box-shadow: 0 12px 28px rgba(255,255,255,.42);
+    }
+    .glass-top {
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .glass-top h1 { margin: 0; }
+    .glass-top > *,
+    .glass-card > *,
+    .glass-stat > * {
+      position: relative;
+      z-index: 1;
+    }
+    .glass-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 430px;
+      gap: 18px;
+    }
+    .glass-card { overflow: hidden; }
+    .glass-card h3 {
+      margin: 0;
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.46);
+    }
+    .glass-pad { padding: 18px; }
+    .glass-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .glass-stat {
+      position: relative;
+      border: 1px solid rgba(255,255,255,.62);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.74), rgba(255,255,255,.3)),
+        linear-gradient(120deg, rgba(125,211,252,.18), rgba(216,180,254,.14));
+      backdrop-filter: blur(24px) saturate(1.6);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.9),
+        inset 0 -16px 34px rgba(255,255,255,.24),
+        0 18px 40px rgba(54,78,112,.16);
+    }
+    .glass-stat small { color: #526173; font-weight: 800; }
+    .glass-stat strong { display: block; margin-top: 8px; font-size: 28px; }
+    #glass input, #glass select {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.36));
+      border-color: rgba(255,255,255,.68);
+      color: #102033;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.88),
+        inset 0 0 18px rgba(255,255,255,.32),
+        0 10px 24px rgba(54,78,112,.12);
+      backdrop-filter: blur(18px) saturate(1.45);
+    }
+    .glass-form { display: grid; gap: 12px; }
+    #glass button,
+    .glass-form button {
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.9), rgba(255,255,255,.52)),
+        linear-gradient(120deg, rgba(125,211,252,.2), rgba(216,180,254,.18));
+      color: #102033;
+      border: 1px solid rgba(255,255,255,.72);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.96),
+        inset 0 -12px 22px rgba(125,211,252,.14),
+        0 16px 34px rgba(54,78,112,.16);
+      backdrop-filter: blur(18px) saturate(1.5);
+    }
+    #glass th { background: rgba(255,255,255,.34); color: #526173; }
+    #glass td, #glass th { border-color: rgba(255,255,255,.42); }
+    #glass .pill {
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.34), 0 8px 18px rgba(54,78,112,.14);
+    }
+
+    /* D: Terminal */
+    #terminal {
+      background: #050812;
+      color: #d1fae5;
+    }
+    .terminal-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      border: 1px solid #1f3b33;
+      border-radius: 8px;
+      background: #07120f;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
+      font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+    }
+    .terminal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1f3b33;
+      background: #0b1915;
+    }
+    .dots { display: flex; gap: 7px; }
+    .dot { width: 11px; height: 11px; border-radius: 50%; background: #ef4444; }
+    .dot:nth-child(2) { background: #f59e0b; }
+    .dot:nth-child(3) { background: #22c55e; }
+    .terminal-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 0;
+      min-height: 720px;
+    }
+    .terminal-main {
+      padding: 20px;
+      border-right: 1px solid #1f3b33;
+    }
+    .terminal-side {
+      padding: 20px;
+      background: #07100e;
+    }
+    .prompt {
+      color: #34d399;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+    .terminal-line {
+      border: 1px solid #1f3b33;
+      background: #081713;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      color: #d1fae5;
+    }
+    .terminal-line b { color: #60a5fa; }
+    .terminal-table {
+      margin-top: 20px;
+      border: 1px solid #1f3b33;
+      border-radius: 8px;
+      overflow: auto;
+    }
+    #terminal th { background: #0b1915; color: #86efac; }
+    #terminal td, #terminal th { border-color: #1f3b33; }
+    #terminal input, #terminal select {
+      background: #030b09;
+      color: #d1fae5;
+      border-color: #1f3b33;
+      font-family: inherit;
+    }
+    .terminal-form { display: grid; gap: 12px; }
+    .terminal-form button {
+      background: #22c55e;
+      color: #04130a;
+      font-family: inherit;
+    }
+
+    /* E: Radar */
+    #radar {
+      background: #f1f5f9;
+      color: #111827;
+    }
+    #radar .intro { color: #111827; }
+    #radar .intro p { color: #64748b; }
+    #radar .badge { color: #065f46; background: #ccfbf1; border-color: #99f6e4; }
+    .radar-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 520px minmax(0, 1fr);
+      gap: 18px;
+    }
+    .radar-panel {
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 18px 44px rgba(15,23,42,.07);
+    }
+    .radar-panel h3 {
+      margin: 0;
+      padding: 15px 17px;
+      border-bottom: 1px solid #dbe3ef;
+    }
+    .radar-visual {
+      position: relative;
+      min-height: 520px;
+      background:
+        repeating-radial-gradient(circle at center, #dbeafe 0 1px, transparent 1px 78px),
+        linear-gradient(#fff, #f8fafc);
+    }
+    .radar-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 132px;
+      height: 132px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 950;
+      box-shadow: 0 16px 36px rgba(37,99,235,.28);
+    }
+    .radar-point {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 12px 26px rgba(15,23,42,.08);
+      font-weight: 850;
+    }
+    .radar-point small {
+      display: block;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .radar-point.a { left: 38px; top: 86px; }
+    .radar-point.b { right: 34px; top: 116px; }
+    .radar-point.c { left: 78px; bottom: 80px; }
+    .radar-point.d { right: 62px; bottom: 88px; }
+    .radar-content {
+      display: grid;
+      gap: 18px;
+    }
+    .radar-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+      padding: 17px;
+    }
+    .radar-form button {
+      grid-column: 1 / -1;
+      background: #0f766e;
+      color: #fff;
+    }
+
+    @media (max-width: 1040px) {
+      .command-shell,
+      .glass-grid,
+      .terminal-body,
+      .radar-shell {
+        grid-template-columns: 1fr;
+      }
+      .map-side,
+      .terminal-main {
+        border-right: 0;
+      }
+      .command-grid,
+      .glass-stats,
+      .command-form,
+      .radar-form {
+        grid-template-columns: 1fr;
+      }
+      .intro { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="jumpbar">
+    <div class="jumpbar-inner">
+      <b>大胆版 UI</b>
+      <a href="#command">B 命令中心</a>
+      <a href="#glass">C 液态玻璃</a>
+      <a href="#terminal">D 极简终端</a>
+      <a href="#radar">E 流量雷达</a>
+    </div>
+  </nav>
+
+  <section id="command" class="concept">
+    <div class="intro">
+      <div>
+        <h2>B. 命令中心版</h2>
+        <p>更像一个成熟云产品后台：左侧导航、顶部操作区、规则列表主导。功能继续变多时不会乱。</p>
+      </div>
+      <span class="badge">大胆指数 6/10 · 最适合长期维护</span>
+    </div>
+    <div class="command-shell">
+      <aside class="command-nav">
+        <h3>IP Relay Center</h3>
+        <div class="nav active">转发规则</div>
+        <div class="nav">流量配额</div>
+        <div class="nav">到期任务</div>
+        <div class="nav">系统服务</div>
+        <div class="nav">语言 / Language</div>
+      </aside>
+      <main class="command-main">
+        <div class="command-top">
+          <div><h1>流量中转管理</h1><div class="muted">统一管理 TCP / UDP 转发、配额与到期策略</div></div>
+          <div><button>🌐 English</button> <button style="color:#b91c1c;background:#fee2e2">安全退出</button></div>
+        </div>
+        <div class="command-grid">
+          <div class="metric-card"><span>总规则</span><strong>2</strong></div>
+          <div class="metric-card"><span>总流量</span><strong>5.1 GB</strong></div>
+          <div class="metric-card"><span>受限规则</span><strong>1</strong></div>
+          <div class="metric-card"><span>即将到期</span><strong>1</strong></div>
+        </div>
+        <div class="white-card">
+          <h3>新增转发规则</h3>
+          <div class="pad command-form">
+            <div><label>协议</label><select><option>TCP + UDP</option></select></div>
+            <div><label>监听端口</label><input></div>
+            <div class="span2"><label>目标 IP / 域名</label><input></div>
+            <div><label>目标端口</label><input></div>
+            <div><label>流量上限</label><input placeholder="MB"></div>
+            <div class="span2"><label>备注</label><input></div>
+            <div><label>到期时间</label><input></div>
+            <button>添加规则</button>
+          </div>
+        </div>
+        <div class="white-card" style="margin-top:16px">
+          <h3>当前规则</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>协议</th><th>监听</th><th>目标</th><th>流量</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td><span class="pill ok">运行中</span></td><td><button style="background:#fee2e2;color:#b91c1c">删除</button></td></tr>
+                <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>1.9 GB / 不限<div class="progress"><span style="width:12%"></span></div></td><td><span class="pill warn">不限流量</span></td><td><button style="background:#fee2e2;color:#b91c1c">删除</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section id="glass" class="concept">
+    <div class="intro">
+      <div>
+        <h2>C. 液态玻璃版</h2>
+        <p>更像有厚度的透明材质：边缘高光、背景折射、内部流动光感都会更明显。适合 README 截图或公开展示。</p>
+      </div>
+      <span class="badge">大胆指数 9/10 · 最好看</span>
+    </div>
+    <div class="glass-shell">
+      <header class="glass-top">
+        <h1>Traffic Relay Nebula</h1>
+        <div><button>🌐 English</button> <button>Logout</button></div>
+      </header>
+      <div class="glass-grid">
+        <main>
+          <div class="glass-stats">
+            <div class="glass-stat"><small>Total Rules</small><strong>2</strong></div>
+            <div class="glass-stat"><small>Upload + Download</small><strong>5.1 GB</strong></div>
+            <div class="glass-stat"><small>Quota Rules</small><strong>1</strong></div>
+          </div>
+          <div class="glass-card">
+            <h3>Active Forwarding</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>Protocol</th><th>Port</th><th>Target</th><th>Traffic</th><th>Expires</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="pill tcp">TCP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td>2026-07-08</td><td><button>Delete</button></td></tr>
+                  <tr><td><span class="pill udp">UDP</span></td><td><b>38342</b></td><td><span class="pill">38.244.38.29:16589</span></td><td>1.9 GB / Unlimited<div class="progress"><span style="width:12%"></span></div></td><td>Unlimited</td><td><button>Delete</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </main>
+        <aside class="glass-card">
+          <h3>Create Relay</h3>
+          <div class="glass-pad glass-form">
+            <div><label>Protocol</label><select><option>TCP + UDP</option></select></div>
+            <div><label>Listen Port</label><input value="38342"></div>
+            <div><label>Target Host</label><input value="38.244.38.29"></div>
+            <div><label>Target Port</label><input value="16589"></div>
+            <div><label>Traffic Limit</label><input value="10240 MB"></div>
+            <div><label>Expires UTC+8</label><input value="2026-07-08 18:30"></div>
+            <button>Create Rule</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="terminal" class="concept">
+    <div class="intro">
+      <div>
+        <h2>D. 极简终端版</h2>
+        <p>把面板做成“可视化命令行”。很适合懂服务器的人，信息密度高，但新手友好度一般。</p>
+      </div>
+      <span class="badge">大胆指数 7/10 · 很工程师</span>
+    </div>
+    <div class="terminal-shell">
+      <div class="terminal-head">
+        <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <strong>iptables-panel@relay:~</strong>
+        <button>logout</button>
+      </div>
+      <div class="terminal-body">
+        <main class="terminal-main">
+          <div class="prompt">$ iprelay status --summary</div>
+          <div class="terminal-line">active_rules=<b>2</b> tcp=<b>1</b> udp=<b>1</b> traffic_total=<b>5.1GB</b></div>
+          <div class="terminal-line">quota_policy=<b>upload+download</b> timezone=<b>UTC+8</b> enforcement=<b>auto-disable</b></div>
+          <div class="terminal-table">
+            <table>
+              <thead><tr><th>proto</th><th>listen</th><th>target</th><th>traffic</th><th>expires</th><th>op</th></tr></thead>
+              <tbody>
+                <tr><td>tcp</td><td>38342</td><td>38.244.38.29:16589</td><td>3.2GB/10GB</td><td>2026-07-08</td><td><button>delete</button></td></tr>
+                <tr><td>udp</td><td>38342</td><td>38.244.38.29:16589</td><td>1.9GB/unlimited</td><td>never</td><td><button>delete</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </main>
+        <aside class="terminal-side">
+          <div class="prompt">$ iprelay add</div>
+          <div class="terminal-form">
+            <div><label>--protocol</label><select><option>tcp+udp</option></select></div>
+            <div><label>--listen</label><input value="38342"></div>
+            <div><label>--target</label><input value="38.244.38.29"></div>
+            <div><label>--target-port</label><input value="16589"></div>
+            <div><label>--quota</label><input value="10240MB"></div>
+            <div><label>--expires</label><input value="2026-07-08T18:30+08"></div>
+            <button>run add command</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="radar" class="concept">
+    <div class="intro">
+      <div>
+        <h2>E. 流量雷达版</h2>
+        <p>把规则当成雷达上的连接点，强调“哪些规则活跃、哪些快到期、哪些接近流量上限”。比较有辨识度。</p>
+      </div>
+      <span class="badge">大胆指数 8/10 · 适合流量管理</span>
+    </div>
+    <div class="radar-shell">
+      <div class="radar-panel">
+        <h3>流量雷达</h3>
+        <div class="radar-visual">
+          <div class="radar-center">Relay<br>Panel</div>
+          <div class="radar-point a">TCP 38342<small>32% quota</small></div>
+          <div class="radar-point b">UDP 38342<small>unlimited</small></div>
+          <div class="radar-point c">Expires Soon<small>2026-07-08</small></div>
+          <div class="radar-point d">Target<small>38.244.38.29</small></div>
+        </div>
+      </div>
+      <div class="radar-content">
+        <div class="radar-panel">
+          <h3>新增转发</h3>
+          <div class="radar-form">
+            <div><label>协议</label><select><option>TCP + UDP</option></select></div>
+            <div><label>监听端口</label><input></div>
+            <div><label>目标 IP / 域名</label><input></div>
+            <div><label>目标端口</label><input></div>
+            <div><label>流量上限</label><input placeholder="MB"></div>
+            <div><label>到期时间 UTC+8</label><input></div>
+            <button>添加到雷达</button>
+          </div>
+        </div>
+        <div class="radar-panel">
+          <h3>规则列表</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>协议</th><th>监听</th><th>目标</th><th>流量</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr><td><span class="pill tcp">TCP</span></td><td>38342</td><td><span class="pill">38.244.38.29:16589</span></td><td>3.2 GB / 10 GB<div class="progress"><span style="width:32%"></span></div></td><td><span class="pill ok">运行中</span></td></tr>
+                <tr><td><span class="pill udp">UDP</span></td><td>38342</td><td><span class="pill">38.244.38.29:16589</span></td><td>1.9 GB / 不限<div class="progress"><span style="width:12%"></span></div></td><td><span class="pill warn">不限流量</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
