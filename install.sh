@@ -99,6 +99,42 @@ uninstall_panel() {
   fi
 }
 
+confirm_stable_transition() {
+  if [ ! -f "$SERVICE_FILE" ]; then
+    return
+  fi
+
+  local current_exec current_backend
+  current_exec=$(sed -n 's/^ExecStart=//p' "$SERVICE_FILE" | head -n 1)
+  if ! printf '%s' "$current_exec" | grep -q -- '--backend'; then
+    return
+  fi
+
+  if printf '%s' "$current_exec" | grep -q -- '--backend nftables'; then
+    current_backend="nftables"
+  else
+    current_backend="iptables"
+  fi
+
+  if [ "$current_backend" = "nftables" ]; then
+    echo "⚠️  稳定版固定使用 iptables，当前实验版使用 nftables。"
+    echo "⚠️  nftables 规则会继续保留在内核中，但不会显示在稳定版面板里。"
+    echo "⚠️  本安装器不会自动迁移或删除这些规则。"
+    read -r -p "确认切换到 iptables 请输入 SWITCH: " BACKEND_SWITCH_CONFIRM
+    if [ "$BACKEND_SWITCH_CONFIRM" != "SWITCH" ]; then
+      echo "已取消安装。"
+      exit 0
+    fi
+  elif [ "${PANEL_CHANNEL_SWITCH_CONFIRMED:-0}" != "1" ]; then
+    echo "⚠️  即将从实验版切换到稳定版。转发规则会保留，但配额和到期时间元数据不会自动迁移。"
+    read -r -p "确认切换版本请输入 SWITCH: " CHANNEL_SWITCH_CONFIRM
+    if [ "$CHANNEL_SWITCH_CONFIRM" != "SWITCH" ]; then
+      echo "已取消安装。"
+      exit 0
+    fi
+  fi
+}
+
 if [ -d "$INSTALL_DIR" ] || [ -f "$SERVICE_FILE" ]; then
   echo "====================================================="
   echo "   检测到已安装的 Iptables 流量中转面板"
@@ -119,6 +155,7 @@ if [ -d "$INSTALL_DIR" ] || [ -f "$SERVICE_FILE" ]; then
       exit 0
       ;;
     *)
+      confirm_stable_transition
       echo "将继续升级面板程序。现有 iptables 转发规则不会被清空。"
       ;;
   esac
@@ -170,15 +207,15 @@ TRACK_PREFIX = "iptables-panel-track:"
 # --- 双语字典 (加入备注字段和域名提示) ---
 T = {
     'zh': {
-        'login_title': '🛡️ 中转面板登录', 'username': '用户名', 'password': '密码', 'login_btn': '安全登录',
-        'panel_title': '🚀 流量中转管理面板', 'logout': '安全退出', 'add_rule': '➕ 新增端口转发',
+        'login_title': '流量中转面板登录', 'username': '用户名', 'password': '密码', 'login_btn': '登录面板',
+        'panel_title': '流量中转管理面板', 'logout': '退出', 'add_rule': '新建转发规则',
         'protocol': '转发协议', 'local_port': '监听端口', 'target_ip': '目标 IP 或 域名', 'target_port': '目标端口',
         'remark': '备注信息', 'remark_ph': '选填 (如: Web/游戏服)', 'add_btn': '立即添加转发规则', 
-        'cur_rules': '📋 当前生效规则', 'proto': '协议', 'forward_to': '转发至',
-        'action': '操作', 'delete': '🗑️ 删除', 'no_rules': '当前没有配置任何转发规则。',
+        'cur_rules': '当前生效规则', 'proto': '协议', 'forward_to': '转发至',
+        'action': '操作', 'delete': '删除', 'no_rules': '当前没有配置任何转发规则。',
         'confirm_del': '确定要删除这条规则吗？', 'tcp_only': '纯 TCP (网页/SSH)',
         'udp_only': '纯 UDP (Hysteria2)', 'dual_stack': 'TCP + UDP 双栈',
-        'lang_btn': '🌐 English', 'switch_to': 'en', 'err_port': '端口必须是 1-65535 之间的数字！',
+        'lang_btn': 'English', 'switch_to': 'en', 'status_online': '服务在线', 'err_port': '端口必须是 1-65535 之间的数字！',
         'err_ip': '无效的 IP 地址或域名解析失败！', 'err_duplicate': '规则已存在，无需重复添加。',
         'add_success': '添加成功！', 'del_success': '删除成功',
         'login_error': '用户名或密码错误', 'overview': '运行概览', 'total_rules': '总规则', 'total_traffic': '总流量',
@@ -189,15 +226,15 @@ T = {
         'err_expires': '到期时间格式无效，请使用 UTC+8 时间。'
     },
     'en': {
-        'login_title': '🛡️ Panel Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Secure Login',
-        'panel_title': '🚀 Traffic Forwarding Panel', 'logout': 'Logout', 'add_rule': '➕ Add Port Forwarding',
+        'login_title': 'Traffic Forwarding Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Sign in',
+        'panel_title': 'Traffic Forwarding Panel', 'logout': 'Logout', 'add_rule': 'Create Forwarding Rule',
         'protocol': 'Protocol', 'local_port': 'Local Port', 'target_ip': 'Target IP / Domain', 'target_port': 'Target Port',
         'remark': 'Remark / Note', 'remark_ph': 'Optional', 'add_btn': 'Add Forwarding Rule', 
-        'cur_rules': '📋 Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
-        'action': 'Action', 'delete': '🗑️ Delete', 'no_rules': 'No rules configured currently.',
+        'cur_rules': 'Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
+        'action': 'Action', 'delete': 'Delete', 'no_rules': 'No rules configured currently.',
         'confirm_del': 'Are you sure you want to delete this rule?', 'tcp_only': 'TCP Only (Web)',
         'udp_only': 'UDP Only (Hysteria2)', 'dual_stack': 'TCP + UDP Dual',
-        'lang_btn': '🌐 中文', 'switch_to': 'zh', 'err_port': 'Ports must be numbers between 1 and 65535!',
+        'lang_btn': '中文', 'switch_to': 'zh', 'status_online': 'Service online', 'err_port': 'Ports must be numbers between 1 and 65535!',
         'err_ip': 'Invalid IP or Domain resolution failed!', 'err_duplicate': 'Rule already exists. No duplicate was added.',
         'add_success': 'Added successfully!', 'del_success': 'Deleted',
         'login_error': 'Invalid username or password', 'overview': 'Overview', 'total_rules': 'Total Rules', 'total_traffic': 'Total Traffic',
@@ -511,8 +548,7 @@ HEADER_HTML = """
         .theme-glass .topbar,
         .theme-glass .metric,
         .theme-glass .panel-card,
-        .theme-glass .login-card,
-        .theme-glass .glass-item {
+        .theme-glass .login-card {
             position: relative;
             background:
                 linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.3) 42%, rgba(255,255,255,.55)),
@@ -527,8 +563,7 @@ HEADER_HTML = """
         .theme-glass .topbar::before,
         .theme-glass .metric::before,
         .theme-glass .panel-card::before,
-        .theme-glass .login-card::before,
-        .theme-glass .glass-item::before {
+        .theme-glass .login-card::before {
             content: "";
             position: absolute;
             inset: 1px;
@@ -543,8 +578,7 @@ HEADER_HTML = """
         .theme-glass .topbar::after,
         .theme-glass .metric::after,
         .theme-glass .panel-card::after,
-        .theme-glass .login-card::after,
-        .theme-glass .glass-item::after {
+        .theme-glass .login-card::after {
             content: "";
             position: absolute;
             left: 16px;
@@ -559,8 +593,7 @@ HEADER_HTML = """
         .theme-glass .topbar > *,
         .theme-glass .metric > *,
         .theme-glass .panel-card > *,
-        .theme-glass .login-card > *,
-        .theme-glass .glass-item > * {
+        .theme-glass .login-card > * {
             position: relative;
             z-index: 1;
         }
@@ -608,23 +641,337 @@ HEADER_HTML = """
             font-size: .88rem;
             vertical-align: middle;
         }
-        .theme-glass .glass-rail {
+
+        /* Network console redesign */
+        body {
+            background:
+                linear-gradient(118deg, transparent 0 14%, rgba(98,185,194,.10) 14% 23%, transparent 23% 62%, rgba(123,104,238,.08) 62% 72%, transparent 72%),
+                #eaf0f4;
+        }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border-bottom-color: rgba(115,132,151,.22);
+            background: rgba(242,247,250,.78);
+            box-shadow: 0 8px 28px rgba(28,45,66,.06);
+            backdrop-filter: blur(22px) saturate(1.35);
+        }
+        .topbar-inner {
+            max-width: 1400px;
+            min-height: 70px;
+            padding: 0 24px;
+        }
+        .brand { gap: 12px; color: #10233e; }
+        .brand-mark {
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255,255,255,.72);
+            background: linear-gradient(145deg, #10233e, #285c68);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 8px 20px rgba(16,35,62,.16);
+        }
+        .brand-title { font-size: .98rem; }
+        .page-shell {
+            max-width: 1400px;
+            padding: 28px 24px 48px;
+        }
+        .page-header {
+            min-height: 54px;
+            margin-bottom: 22px;
+        }
+        .page-heading { min-width: 0; }
+        .page-title {
+            color: #10233e;
+            font-size: 1.7rem;
+            line-height: 1.2;
+        }
+        .page-title::after, .theme-glass .page-title::after { display: none; }
+        .service-state {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 6px;
+            color: #477177;
+            font-size: .78rem;
+            font-weight: 750;
+            text-transform: uppercase;
+        }
+        .service-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #18a46c;
+            box-shadow: 0 0 0 4px rgba(24,164,108,.12);
+        }
+        .page-actions .btn, .topbar .btn {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 13px;
+            background: rgba(255,255,255,.48);
+            border-color: rgba(115,132,151,.26);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+        }
+        .console-layout {
             display: grid;
-            grid-template-columns: 1.2fr 1fr 1fr;
-            gap: 14px;
-            margin-bottom: 18px;
+            grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+            align-items: start;
+            gap: 20px;
         }
-        .theme-glass .glass-item {
-            border: 1px solid rgba(255,255,255,.62);
+        .control-column {
+            min-width: 0;
+            display: grid;
+            gap: 20px;
+        }
+        .compose-panel {
+            position: sticky;
+            top: 92px;
+            margin: 0;
+        }
+        .panel-card, .metric-strip, .login-card {
+            border: 1px solid rgba(255,255,255,.72);
+            background: rgba(250,252,253,.66);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 18px 44px rgba(34,55,78,.10);
+            backdrop-filter: blur(24px) saturate(1.3);
+        }
+        .panel-card { margin: 0; }
+        .panel-header {
+            min-height: 56px;
+            padding: 17px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #10233e;
+            background: rgba(255,255,255,.28);
+            border-bottom-color: rgba(115,132,151,.16);
+            font-size: .98rem;
+        }
+        .panel-caption {
+            color: #748293;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+        .panel-body { padding: 20px; }
+        .compose-form {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 15px 12px;
+        }
+        .form-field { min-width: 0; }
+        .form-field-wide { grid-column: 1 / -1; }
+        .form-label {
+            color: #586a7d;
+            font-size: .79rem;
+            font-weight: 750;
+        }
+        .form-control, .form-select {
+            min-height: 44px;
+            border-color: rgba(115,132,151,.26);
+            background: rgba(255,255,255,.58);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.76);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #168798;
+            box-shadow: 0 0 0 .2rem rgba(22,135,152,.12);
+        }
+        .submit-rule {
+            min-height: 46px;
+            margin-top: 3px;
+            border-color: #176f7c;
+            background: linear-gradient(135deg, #176f7c, #188b88);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 12px 24px rgba(23,111,124,.18);
+        }
+        .submit-rule:hover { border-color: #135f69; background: linear-gradient(135deg, #135f69, #147875); }
+        .metric-strip {
+            display: grid;
+            grid-template-columns: 1.1fr 1.4fr 1fr 1fr;
+            overflow: hidden;
             border-radius: 8px;
-            padding: 14px 16px;
         }
-        .theme-glass .glass-item strong {
-            display: block;
-            font-size: 1.05rem;
+        .metric-item {
+            min-width: 0;
+            padding: 18px 20px;
+            border-left: 1px solid rgba(115,132,151,.14);
         }
-        @media (max-width: 900px) {
-            .theme-glass .glass-rail { grid-template-columns: 1fr; }
+        .metric-item:first-child { border-left: 0; }
+        .metric-label {
+            color: #6a798a;
+            font-size: .75rem;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            margin-top: 8px;
+            color: #10233e;
+            font-size: 1.55rem;
+            line-height: 1.1;
+        }
+        .metric-protocol {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .protocol-key { color: #168798; font-size: .72rem; font-weight: 800; }
+        .protocol-key.udp-key { color: #7654b8; }
+        .rule-count {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            height: 26px;
+            padding: 0 8px;
+            border-radius: 6px;
+            color: #176f7c;
+            background: rgba(23,111,124,.09);
+            font-size: .78rem;
+        }
+        .rules-table { table-layout: auto; }
+        .rules-table thead th {
+            padding: 12px 14px;
+            color: #6a798a;
+            background: rgba(234,240,244,.42);
+            border-color: rgba(115,132,151,.14);
+            font-size: .72rem;
+        }
+        .rules-table tbody td {
+            padding: 15px 14px;
+            border-color: rgba(115,132,151,.12);
+        }
+        .rules-table tbody tr:last-child td { border-bottom: 0; }
+        .rules-table .badge {
+            min-width: 44px;
+            border: 1px solid rgba(255,255,255,.48);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+        }
+        .badge-tcp { background: #2262b7; }
+        .badge-udp { background: #7654b8; }
+        .port-value { color: #10233e; font-size: 1rem; font-weight: 800; }
+        .target-pill {
+            border: 1px solid rgba(16,35,62,.08);
+            background: #10233e;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.13);
+            font-size: .84rem;
+        }
+        .traffic-value { color: #2f5660; font-weight: 700; white-space: nowrap; }
+        .expiry-value { color: #657386; font-size: .83rem; white-space: nowrap; }
+        .delete-button {
+            min-width: 52px;
+            border-color: rgba(201,74,88,.34);
+            color: #b53746;
+            background: rgba(255,255,255,.42);
+        }
+        .delete-button:hover { color: #fff; background: #b53746; border-color: #b53746; }
+        .alert { box-shadow: inset 0 1px 0 rgba(255,255,255,.66); }
+        .login-card { padding: 30px; }
+        .login-brand {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            display: grid;
+            place-items: center;
+            border-radius: 8px;
+            color: #fff;
+            background: linear-gradient(145deg, #10233e, #285c68);
+            font-weight: 850;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 12px 24px rgba(16,35,62,.18);
+        }
+        .login-caption {
+            margin: 7px 0 22px;
+            color: #6a798a;
+            text-align: center;
+            font-size: .86rem;
+        }
+        .theme-glass {
+            background:
+                linear-gradient(118deg, transparent 0 12%, rgba(92,184,190,.18) 12% 21%, transparent 21% 58%, rgba(139,114,210,.12) 58% 69%, transparent 69%),
+                linear-gradient(150deg, #dbeef1, #f4f7f8 46%, #e3eef0 74%, #eef0f7);
+        }
+        .theme-glass::before {
+            inset: 0;
+            transform: none;
+            filter: none;
+            opacity: .82;
+            background:
+                linear-gradient(105deg, transparent 0 28%, rgba(255,255,255,.54) 28% 36%, transparent 36% 72%, rgba(114,202,198,.12) 72% 80%, transparent 80%);
+        }
+        .theme-glass::after { opacity: .18; background-size: 92px 92px; }
+        .theme-glass .topbar,
+        .theme-glass .panel-card,
+        .theme-glass .metric-strip,
+        .theme-glass .login-card {
+            background: linear-gradient(135deg, rgba(255,255,255,.70), rgba(255,255,255,.38));
+            border-color: rgba(255,255,255,.74);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.94), 0 18px 44px rgba(34,55,78,.11);
+            backdrop-filter: blur(26px) saturate(1.4);
+        }
+        .theme-glass .metric-strip::before { display: none; }
+
+        @media (max-width: 1040px) {
+            .console-layout { grid-template-columns: 310px minmax(0, 1fr); }
+            .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .metric-item:nth-child(3) { border-left: 0; }
+            .metric-item:nth-child(n+3) { border-top: 1px solid rgba(115,132,151,.14); }
+        }
+        @media (max-width: 820px) {
+            .topbar-inner { min-height: 62px; padding: 0 14px; }
+            .brand-mark { width: 36px; height: 36px; }
+            .brand-title { max-width: 52vw; }
+            .page-shell { padding: 20px 14px 34px; }
+            .page-header { align-items: center !important; flex-direction: row; }
+            .page-actions { width: auto; }
+            .page-actions .btn { flex: 0 0 auto; }
+            .console-layout { grid-template-columns: 1fr; }
+            .compose-panel { position: static; }
+            .control-column { display: contents; }
+            .metric-strip { grid-row: 1; }
+            .compose-panel { grid-row: 2; }
+            .rules-panel { grid-row: 3; }
+            .rules-table thead { display: none; }
+            .rules-table, .rules-table tbody, .rules-table tr, .rules-table td { display: block; width: 100%; }
+            .rules-table tbody { padding: 10px; }
+            .rules-table tbody tr {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0;
+                margin-bottom: 10px;
+                overflow: hidden;
+                border: 1px solid rgba(115,132,151,.16);
+                border-radius: 8px;
+                background: rgba(255,255,255,.28);
+            }
+            .rules-table tbody tr:last-child { margin-bottom: 0; }
+            .rules-table tbody td {
+                min-width: 0;
+                padding: 11px 12px;
+                border: 0;
+                border-bottom: 1px solid rgba(115,132,151,.10);
+            }
+            .rules-table tbody td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 5px;
+                color: #738193;
+                font-size: .68rem;
+                font-weight: 750;
+                text-transform: uppercase;
+            }
+            .rules-table .target-cell, .rules-table .remark-cell-mobile, .rules-table .action-cell { grid-column: 1 / -1; }
+            .rules-table .action-cell { text-align: left !important; }
+            .rules-table .action-cell form, .rules-table .delete-button { width: 100%; }
+            .empty-row { grid-column: 1 / -1 !important; }
+            .empty-row::before { display: none !important; }
+        }
+        @media (max-width: 460px) {
+            .page-title { font-size: 1.4rem; }
+            .service-state { margin-bottom: 4px; }
+            .page-header { align-items: flex-start !important; flex-direction: column; }
+            .page-actions { width: 100%; }
+            .page-actions .btn { width: 100%; min-width: 58px; padding-inline: 10px; }
+            .metric-item { padding: 15px 14px; }
+            .metric-value { font-size: 1.3rem; }
+            .compose-form { grid-template-columns: 1fr; }
+            .form-field-wide { grid-column: auto; }
         }
     </style>
 </head>
@@ -643,7 +990,9 @@ HEADER_HTML = """
 LOGIN_HTML = HEADER_HTML + """
 <main class="login-shell">
     <div class="login-card">
-        <h1 class="login-title mb-4">{{ t.login_title }}</h1>
+        <div class="login-brand">IP</div>
+        <h1 class="login-title">{{ t.login_title }}</h1>
+        <p class="login-caption">{{ t.panel_title }}</p>
         {% if error %}<div class="alert alert-danger py-2 text-center">{{ error }}</div>{% endif %}
         <form method="POST" action="/login">
             <div class="mb-3"><label class="form-label">{{ t.username }}</label><input type="text" class="form-control" name="username" autocomplete="username" required></div>
@@ -657,90 +1006,82 @@ LOGIN_HTML = HEADER_HTML + """
 DASHBOARD_HTML = HEADER_HTML + """
 <main class="page-shell">
     <div class="page-header d-flex align-items-center justify-content-between">
-        <h1 class="page-title">{{ t.panel_title }}</h1>
+        <div class="page-heading">
+            <div class="service-state"><span class="service-dot"></span>{{ t.status_online }}</div>
+            <h1 class="page-title">{{ t.panel_title }}</h1>
+        </div>
         <div class="page-actions">
             <a href="/logout" class="btn btn-outline-danger">{{ t.logout }}</a>
         </div>
     </div>
     {% if message %}<div class="alert alert-{{ status }}">{{ message }}</div>{% endif %}
 
-    <div class="metric-grid" aria-label="{{ t.overview }}">
-        <div class="metric">
-            <div class="metric-label">{{ t.total_rules }}</div>
-            <div class="metric-value">{{ rules|length }}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">{{ t.total_traffic }}</div>
-            <div class="metric-value">{{ total_traffic_text }}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">{{ t.tcp_rules }}</div>
-            <div class="metric-value">{{ rules|selectattr('protocol', 'equalto', 'TCP')|list|length }}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">{{ t.udp_rules }}</div>
-            <div class="metric-value">{{ rules|selectattr('protocol', 'equalto', 'UDP')|list|length }}</div>
-        </div>
-    </div>
-
-    <section class="glass-rail" aria-label="Theme C">
-        <div class="glass-item"><span class="text-muted">Style</span><strong>Liquid Glass · C</strong></div>
-        <div class="glass-item"><span class="text-muted">Quota</span><strong>{{ t.traffic_note }}</strong></div>
-        <div class="glass-item"><span class="text-muted">Time</span><strong>{{ t.expires_ph }}</strong></div>
-    </section>
-    
-    <section class="panel-card">
-        <div class="panel-header">{{ t.add_rule }}</div>
-        <div class="panel-body">
-            <form method="POST" action="/add" class="row g-3">
-                <div class="col-lg-2 col-md-4"><label class="form-label">{{ t.protocol }}</label>
+    <div class="console-layout">
+        <aside class="panel-card compose-panel">
+            <div class="panel-header">
+                <span>{{ t.add_rule }}</span>
+                <span class="panel-caption">DNAT</span>
+            </div>
+            <div class="panel-body">
+                <form method="POST" action="/add" class="compose-form">
+                    <div class="form-field form-field-wide"><label class="form-label">{{ t.protocol }}</label>
                     <select class="form-select" name="protocol">
                         <option value="tcp">{{ t.tcp_only }}</option>
                         <option value="udp" selected>{{ t.udp_only }}</option>
                         <option value="all">{{ t.dual_stack }}</option>
                     </select>
-                </div>
-                <div class="col-lg-2 col-md-4"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
-                <div class="col-lg-3 col-md-4"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
-                <div class="col-lg-2 col-md-4"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
-                <div class="col-lg-2 col-md-6"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
-                <div class="col-lg-1 col-md-6"><label class="form-label">{{ t.quota }}</label><input type="number" min="1" step="1" class="form-control" name="quota_mb" placeholder="MB"></div>
-                <div class="col-lg-2 col-md-6"><label class="form-label">{{ t.expires_at }}</label><input type="datetime-local" class="form-control" name="expires_at" title="{{ t.expires_ph }}"></div>
-                <div class="col-12"><button type="submit" class="btn btn-primary w-100">{{ t.add_btn }}</button></div>
-            </form>
-        </div>
-    </section>
+                    </div>
+                    <div class="form-field"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
+                    <div class="form-field"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
+                    <div class="form-field form-field-wide"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
+                    <div class="form-field form-field-wide"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
+                    <div class="form-field"><label class="form-label">{{ t.quota }}</label><input type="number" min="1" step="1" class="form-control" name="quota_mb" placeholder="MB"></div>
+                    <div class="form-field"><label class="form-label">{{ t.expires_at }}</label><input type="datetime-local" class="form-control" name="expires_at" title="{{ t.expires_ph }}"></div>
+                    <div class="form-field form-field-wide"><button type="submit" class="btn btn-primary submit-rule w-100">{{ t.add_btn }}</button></div>
+                </form>
+            </div>
+        </aside>
 
-    <section class="panel-card">
-        <div class="panel-header">{{ t.cur_rules }}</div>
-        <div class="table-responsive p-0">
-            <table class="table table-hover">
-                <thead><tr><th class="ps-4">{{ t.proto }}</th><th>{{ t.local_port }}</th><th>{{ t.forward_to }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th>{{ t.traffic }}<br><small class="text-muted">{{ t.traffic_note }}</small></th><th>{{ t.expires_at }}</th><th class="text-end pe-4">{{ t.action }}</th></tr></thead>
-                <tbody>
-                    {% for rule in rules %}
-                    <tr>
-                        <td class="ps-4"><span class="badge {% if rule.protocol == 'TCP' %}badge-tcp{% else %}badge-udp{% endif %}">{{ rule.protocol }}</span></td>
-                        <td class="fw-bold">{{ rule.local_port }}</td><td class="text-muted">{{ t.forward_to }}</td>
-                        <td><span class="target-pill">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
-                        <td><div class="remark-cell" title="{{ rule.remark }}">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</div></td>
-                        <td><span class="text-muted">{{ rule.traffic_text }}</span></td>
-                        <td><span class="text-muted">{{ rule.expires_text }}</span></td>
-                        <td class="text-end pe-4">
-                            <form method="POST" action="/delete" style="display:inline;">
-                                <input type="hidden" name="protocol" value="{{ rule.protocol | lower }}">
-                                <input type="hidden" name="local_port" value="{{ rule.local_port }}">
-                                <input type="hidden" name="target_ip" value="{{ rule.target_ip }}">
-                                <input type="hidden" name="target_port" value="{{ rule.target_port }}">
-                                <input type="hidden" name="remark" value="{{ rule.remark }}">
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ t.confirm_del }}');">{{ t.delete }}</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}<tr><td colspan="8" class="text-center empty-row">{{ t.no_rules }}</td></tr>{% endfor %}
-                </tbody>
-            </table>
+        <div class="control-column">
+            <section class="metric-strip" aria-label="{{ t.overview }}">
+                <div class="metric-item"><div class="metric-label">{{ t.total_rules }}</div><div class="metric-value">{{ rules|length }}</div></div>
+                <div class="metric-item"><div class="metric-label">{{ t.total_traffic }}</div><div class="metric-value">{{ total_traffic_text }}</div></div>
+                <div class="metric-item"><div class="metric-label">{{ t.tcp_rules }}</div><div class="metric-value metric-protocol"><span class="protocol-key">TCP</span>{{ rules|selectattr('protocol', 'equalto', 'TCP')|list|length }}</div></div>
+                <div class="metric-item"><div class="metric-label">{{ t.udp_rules }}</div><div class="metric-value metric-protocol"><span class="protocol-key udp-key">UDP</span>{{ rules|selectattr('protocol', 'equalto', 'UDP')|list|length }}</div></div>
+            </section>
+
+            <section class="panel-card rules-panel">
+                <div class="panel-header"><span>{{ t.cur_rules }}</span><span class="rule-count">{{ rules|length }}</span></div>
+                <div class="table-responsive p-0">
+                    <table class="table rules-table">
+                        <thead><tr><th>{{ t.proto }}</th><th>{{ t.local_port }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th>{{ t.traffic }}<br><small class="text-muted">{{ t.traffic_note }}</small></th><th>{{ t.expires_at }}</th><th class="text-end">{{ t.action }}</th></tr></thead>
+                        <tbody>
+                            {% for rule in rules %}
+                            <tr>
+                                <td data-label="{{ t.proto }}"><span class="badge {% if rule.protocol == 'TCP' %}badge-tcp{% else %}badge-udp{% endif %}">{{ rule.protocol }}</span></td>
+                                <td data-label="{{ t.local_port }}"><span class="port-value">{{ rule.local_port }}</span></td>
+                                <td class="target-cell" data-label="{{ t.target_ip }} : {{ t.target_port }}"><span class="target-pill">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
+                                <td class="remark-cell-mobile" data-label="{{ t.remark }}"><div class="remark-cell" title="{{ rule.remark }}">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</div></td>
+                                <td data-label="{{ t.traffic }}"><span class="traffic-value">{{ rule.traffic_text }}</span></td>
+                                <td data-label="{{ t.expires_at }}"><span class="expiry-value">{{ rule.expires_text }}</span></td>
+                                <td class="text-end action-cell" data-label="{{ t.action }}">
+                                    <form method="POST" action="/delete" style="display:inline;">
+                                        <input type="hidden" name="protocol" value="{{ rule.protocol | lower }}">
+                                        <input type="hidden" name="local_port" value="{{ rule.local_port }}">
+                                        <input type="hidden" name="target_ip" value="{{ rule.target_ip }}">
+                                        <input type="hidden" name="target_port" value="{{ rule.target_port }}">
+                                        <input type="hidden" name="remark" value="{{ rule.remark }}">
+                                        <button type="submit" class="btn btn-sm delete-button" onclick="return confirm('{{ t.confirm_del }}');">{{ t.delete }}</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}<tr><td colspan="7" class="text-center empty-row">{{ t.no_rules }}</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
-    </section>
+    </div>
 </main></body></html>
 """
 

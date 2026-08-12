@@ -6,7 +6,7 @@
 
 一个轻量级 Web 流量中转面板，用来通过网页管理 TCP / UDP 端口转发规则。
 
-稳定版使用 `Python Flask + iptables`。实验版 `install-v2.sh` 支持 `Python/Rust + iptables/nftables` 多种组合。面板默认使用液态玻璃 UI。
+项目提供统一入口 `setup.sh`。稳定版使用 `Python Flask + iptables`；实验版 `install-v2.sh` 支持 `Python/Rust + iptables/nftables` 多种组合。面板默认使用液态玻璃 UI。
 
 ### 面板预览
 
@@ -27,11 +27,34 @@
 - 升级面板时默认保留已有转发规则
 - 卸载时可选择保留规则或连同面板可见规则一起删除
 
-### 核心安装脚本
+### 统一安装入口（推荐）
+
+普通用户只需运行一个命令：
+
+```bash
+wget -O setup.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/setup.sh && sudo bash setup.sh
+```
+
+统一安装器会提供：
+
+- `稳定版（推荐）`：`Python + iptables`
+- `实验版（高级）`：继续选择 `Python/Rust + iptables/nftables`
+- 自动识别当前已安装的版本、运行时和防火墙后端
+- 同版本升级时默认保留现有转发规则
+- 跨版本或跨后端切换时显示风险提示并要求确认
+
+也可以跳过第一级菜单：
+
+```bash
+sudo bash setup.sh --stable
+sudo bash setup.sh --experimental
+```
+
+### 稳定版直接安装
 
 稳定版安装脚本：`install.sh`
 
-推荐大多数用户使用这个版本。它使用 `Python Flask + iptables`，兼容性最好。
+推荐大多数用户使用这个版本。它使用 `Python Flask + iptables`，兼容性最好。以下命令用于跳过统一入口，直接运行稳定版安装器：
 
 ```bash
 wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/install.sh && sudo bash install.sh
@@ -50,7 +73,7 @@ wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/m
 http://你的服务器IP:面板端口
 ```
 
-### 实验版安装脚本
+### 实验版直接安装
 
 实验版安装脚本：`install-v2.sh`
 
@@ -67,6 +90,14 @@ wget -O install-v2.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-pane
 
 实验版同样支持流量统计、流量上限、UTC+8 到期时间和自动停用规则。
 实验版同样使用液态玻璃 UI。
+
+### 版本升级与切换
+
+- 重新运行 `setup.sh` 并选择当前版本：进入正常升级流程，规则默认保留
+- 稳定版与实验版使用相同防火墙后端时：内核规则保留，但流量配额和到期时间元数据不会自动跨版本迁移
+- 从 `iptables` 切换到 `nftables`，或反向切换：旧后端规则仍在内核中继续生效，但不会显示在新后端面板中
+- 安装器不会自动迁移或删除不同防火墙后端的规则；切换前必须按提示输入 `SWITCH`
+- 只想升级且不确定如何选择时，请继续使用稳定版和 `iptables`
 
 说明：
 
@@ -185,7 +216,7 @@ sudo nft delete table ip iptables_panel
 
 A lightweight web panel for managing TCP / UDP traffic forwarding rules.
 
-The stable installer uses `Python Flask + iptables`. The experimental installer `install-v2.sh` supports multiple combinations of `Python/Rust + iptables/nftables`. The panel uses the Liquid Glass UI by default.
+The project provides a unified entry point, `setup.sh`. The stable installer uses `Python Flask + iptables`; the experimental installer supports multiple combinations of `Python/Rust + iptables/nftables`. The panel uses the Liquid Glass UI by default.
 
 ### UI Preview
 
@@ -206,11 +237,34 @@ The stable installer uses `Python Flask + iptables`. The experimental installer 
 - Keep existing forwarding rules by default during upgrade
 - During uninstall, choose whether to keep rules or remove panel-visible rules
 
-### Core Installer
+### Unified Installer (Recommended)
+
+Most users only need one command:
+
+```bash
+wget -O setup.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/setup.sh && sudo bash setup.sh
+```
+
+The unified installer provides:
+
+- `Stable (recommended)`: `Python + iptables`
+- `Experimental (advanced)`: choose `Python/Rust + iptables/nftables`
+- Detection of the currently installed channel, runtime, and firewall backend
+- Rule-preserving upgrades when staying on the same channel
+- Explicit warnings and confirmation before switching channels or backends
+
+You can also skip the first menu:
+
+```bash
+sudo bash setup.sh --stable
+sudo bash setup.sh --experimental
+```
+
+### Direct Stable Installation
 
 Stable installer: `install.sh`
 
-Recommended for most users. It uses `Python Flask + iptables` and has the best compatibility.
+Recommended for most users. It uses `Python Flask + iptables` and has the best compatibility. Use this command to bypass the unified entry point:
 
 ```bash
 wget -O install.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main/install.sh && sudo bash install.sh
@@ -229,7 +283,7 @@ After installation, open:
 http://your-server-ip:panel-port
 ```
 
-### Experimental Installer
+### Direct Experimental Installation
 
 Experimental installer: `install-v2.sh`
 
@@ -246,6 +300,14 @@ wget -O install-v2.sh https://raw.githubusercontent.com/wcfbxw/iptables-web-pane
 
 The experimental installer also supports traffic usage, traffic quota, UTC+8 expiration time, and automatic rule disabling.
 The experimental installer also uses the Liquid Glass UI.
+
+### Upgrading and Switching
+
+- Rerun `setup.sh` and select the currently installed channel for a normal upgrade; forwarding rules are preserved by default
+- When stable and experimental use the same firewall backend, kernel rules remain, but quota and expiration metadata is not migrated between channels
+- When switching between `iptables` and `nftables`, old backend rules remain active in the kernel but are not shown by the new backend panel
+- The installer never migrates or deletes rules from another firewall backend automatically; type `SWITCH` when the warning is shown
+- When in doubt, stay on the stable channel with `iptables`
 
 Notes:
 
