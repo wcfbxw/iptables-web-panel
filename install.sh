@@ -8,6 +8,51 @@ fi
 
 INSTALL_DIR="/opt/iptables-panel"
 SERVICE_FILE="/etc/systemd/system/iptables-panel.service"
+CONFIG_DIR="/etc/iptables-panel"
+CONFIG_FILE="$CONFIG_DIR/panel.env"
+
+hex_encode() {
+  printf '%s' "$1" | od -An -tx1 | tr -d ' \n'
+}
+
+hex_decode() {
+  local hex_value="$1"
+  local escaped
+  escaped=$(printf '%s' "$hex_value" | sed 's/../\\x&/g')
+  printf '%b' "$escaped"
+}
+
+config_value() {
+  [ -f "$CONFIG_FILE" ] || return 0
+  sed -n "s/^$1=//p" "$CONFIG_FILE" | tail -n 1
+}
+
+load_existing_settings() {
+  EXISTING_PORT="5000"
+  EXISTING_USER="admin"
+  EXISTING_PASSWORD=""
+
+  if [ -f "$CONFIG_FILE" ]; then
+    EXISTING_PORT=$(config_value PANEL_PORT)
+    [ -n "$EXISTING_PORT" ] || EXISTING_PORT="5000"
+    local user_hex password_hex
+    user_hex=$(config_value PANEL_USER_HEX)
+    password_hex=$(config_value PANEL_PASSWORD_HEX)
+    [ -n "$user_hex" ] && EXISTING_USER=$(hex_decode "$user_hex")
+    [ -n "$password_hex" ] && EXISTING_PASSWORD=$(hex_decode "$password_hex")
+    return
+  fi
+
+  if [ -f "$SERVICE_FILE" ]; then
+    local current_exec
+    current_exec=$(sed -n 's/^ExecStart=//p' "$SERVICE_FILE" | head -n 1)
+    EXISTING_PORT=$(printf '%s\n' "$current_exec" | sed -n 's/.*--port \([^ ]*\).*/\1/p')
+    EXISTING_USER=$(printf '%s\n' "$current_exec" | sed -n 's/.*--user \([^ ]*\).*/\1/p')
+    EXISTING_PASSWORD=$(printf '%s\n' "$current_exec" | sed -n 's/.*--password \([^ ]*\).*/\1/p')
+    [ -n "$EXISTING_PORT" ] || EXISTING_PORT="5000"
+    [ -n "$EXISTING_USER" ] || EXISTING_USER="admin"
+  fi
+}
 
 cleanup_visible_rules() {
   echo "⚠️ 即将删除当前面板可识别的 PREROUTING DNAT 和对应 MASQUERADE 规则。"
@@ -91,6 +136,7 @@ uninstall_panel() {
   rm -f "$SERVICE_FILE"
   systemctl daemon-reload > /dev/null 2>&1 || true
   rm -rf "$INSTALL_DIR"
+  rm -rf "$CONFIG_DIR"
 
   if [ "$remove_rules" = "yes" ]; then
     echo "✅ 面板已卸载，并已尝试删除当前面板可见的转发规则。"
@@ -104,13 +150,14 @@ confirm_stable_transition() {
     return
   fi
 
-  local current_exec current_backend
+  local current_exec current_backend current_channel
   current_exec=$(sed -n 's/^ExecStart=//p' "$SERVICE_FILE" | head -n 1)
-  if ! printf '%s' "$current_exec" | grep -q -- '--backend'; then
+  current_channel=$(config_value PANEL_CHANNEL)
+  if [ "$current_channel" != "experimental" ] && ! printf '%s' "$current_exec" | grep -q -- '--backend'; then
     return
   fi
 
-  if printf '%s' "$current_exec" | grep -q -- '--backend nftables'; then
+  if [ "$(config_value PANEL_BACKEND)" = "nftables" ] || printf '%s' "$current_exec" | grep -q -- '--backend nftables'; then
     current_backend="nftables"
   else
     current_backend="iptables"
@@ -165,37 +212,56 @@ echo "====================================================="
 echo "   🚀 欢迎安装 Iptables 流量中转面板 (支持域名解析版)   "
 echo "====================================================="
 
-read -p "👉 请设置面板运行端口 [默认: 5000]: " PANEL_PORT
-PANEL_PORT=${PANEL_PORT:-5000}
+load_existing_settings
 
-read -p "👉 请设置管理员用户名 [默认: admin]: " PANEL_USER
-PANEL_USER=${PANEL_USER:-admin}
+read -p "👉 请设置面板运行端口 [默认: $EXISTING_PORT]: " PANEL_PORT
+PANEL_PORT=${PANEL_PORT:-$EXISTING_PORT}
 
-read -p "👉 请设置管理员密码 [默认: 123456]: " PANEL_PASS
-PANEL_PASS=${PANEL_PASS:-123456}
+read -p "👉 请设置管理员用户名 [默认: $EXISTING_USER]: " PANEL_USER
+PANEL_USER=${PANEL_USER:-$EXISTING_USER}
+
+if [ -n "$EXISTING_PASSWORD" ]; then
+  read -r -s -p "👉 请设置管理员密码 [回车保留原密码]: " PANEL_PASS
+  echo ""
+  PANEL_PASS=${PANEL_PASS:-$EXISTING_PASSWORD}
+else
+  GENERATED_PASSWORD=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')
+  read -r -s -p "👉 请设置管理员密码 [回车使用随机密码]: " PANEL_PASS
+  echo ""
+  PANEL_PASS=${PANEL_PASS:-$GENERATED_PASSWORD}
+fi
 
 PANEL_THEME="glass"
 
 echo ""
 echo "⏳ 正在安装依赖环境 (Python3 & Flask)..."
 apt-get update -y > /dev/null 2>&1
-apt-get install -y python3 python3-pip iptables > /dev/null 2>&1
-pip3 install flask --break-system-packages > /dev/null 2>&1 || pip3 install flask > /dev/null 2>&1
+apt-get install -y python3 python3-pip iptables curl ca-certificates > /dev/null 2>&1
+pip3 install flask gunicorn --break-system-packages > /dev/null 2>&1 || pip3 install flask gunicorn > /dev/null 2>&1
 
 echo "📁 正在配置程序文件..."
 mkdir -p $INSTALL_DIR
 
 # 写入支持双语、备注和域名的 panel.py
-cat << 'EOF' > $INSTALL_DIR/panel.py
-import subprocess, ipaddress, os, argparse, re, socket, json, hashlib, threading, time, datetime
+cat << 'EOF' > $INSTALL_DIR/panel.py.new
+import subprocess, ipaddress, os, argparse, re, socket, json, hashlib, threading, time, datetime, functools
 from flask import Flask, request, render_template_string, session, redirect, url_for
 
+def decode_env_hex(name, fallback):
+    value = os.environ.get(name, '')
+    if not value:
+        return fallback
+    try:
+        return bytes.fromhex(value).decode('utf-8')
+    except (ValueError, UnicodeDecodeError):
+        return fallback
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--port', type=int, default=5000)
-parser.add_argument('--user', type=str, default='admin')
-parser.add_argument('--password', type=str, default='123456')
-parser.add_argument('--theme', type=str, default='map')
-args = parser.parse_args()
+parser.add_argument('--port', type=int, default=int(os.environ.get('PANEL_PORT', '5000')))
+parser.add_argument('--user', type=str, default=decode_env_hex('PANEL_USER_HEX', 'admin'))
+parser.add_argument('--password', type=str, default=decode_env_hex('PANEL_PASSWORD_HEX', '123456'))
+parser.add_argument('--theme', type=str, default=os.environ.get('PANEL_THEME', 'glass'))
+args, _unknown_args = parser.parse_known_args()
 
 ADMIN_USER, ADMIN_PASS, PANEL_PORT = args.user, args.password, args.port
 PANEL_THEME = "glass"
@@ -203,6 +269,14 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 QUOTA_FILE = "/opt/iptables-panel/quotas.json"
 TRACK_PREFIX = "iptables-panel-track:"
+RULE_LOCK = threading.RLock()
+
+def serialized_rule_change(func):
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        with RULE_LOCK:
+            return func(*args, **kwargs)
+    return wrapped
 
 # --- 双语字典 (加入备注字段和域名提示) ---
 T = {
@@ -223,7 +297,8 @@ T = {
         'quota': '流量上限', 'quota_ph': '选填，单位 MB', 'quota_reached': '流量已达上限，规则已自动停用。',
         'err_quota': '流量上限必须是数字，单位 MB。', 'unlimited': '不限',
         'traffic_note': '流量为上行 + 下行总和', 'expires_at': '到期时间', 'expires_ph': 'UTC+8',
-        'err_expires': '到期时间格式无效，请使用 UTC+8 时间。'
+        'err_expires': '到期时间格式无效，请使用 UTC+8 时间。', 'runtime_mode': '运行模式',
+        'kernel_forwarding': '内核转发', 'route_path': '监听入口 → 目标出口'
     },
     'en': {
         'login_title': 'Traffic Forwarding Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Sign in',
@@ -242,7 +317,8 @@ T = {
         'quota': 'Traffic Limit', 'quota_ph': 'Optional, MB', 'quota_reached': 'Traffic limit reached. Rule was disabled.',
         'err_quota': 'Traffic limit must be a number in MB.', 'unlimited': 'Unlimited',
         'traffic_note': 'Traffic is upload + download total', 'expires_at': 'Expires At', 'expires_ph': 'UTC+8',
-        'err_expires': 'Invalid expiration time. Use UTC+8 time.'
+        'err_expires': 'Invalid expiration time. Use UTC+8 time.', 'runtime_mode': 'Runtime',
+        'kernel_forwarding': 'Kernel forwarding', 'route_path': 'Listener → Destination'
     }
 }
 
@@ -648,7 +724,7 @@ HEADER_HTML = """
                 linear-gradient(118deg, transparent 0 14%, rgba(98,185,194,.10) 14% 23%, transparent 23% 62%, rgba(123,104,238,.08) 62% 72%, transparent 72%),
                 #eaf0f4;
         }
-        .topbar {
+        .theme-glass .topbar {
             position: sticky;
             top: 0;
             z-index: 20;
@@ -657,6 +733,7 @@ HEADER_HTML = """
             box-shadow: 0 8px 28px rgba(28,45,66,.06);
             backdrop-filter: blur(22px) saturate(1.35);
         }
+        .topbar .brand { color: #f7fbfa; }
         .topbar-inner {
             max-width: 1400px;
             min-height: 70px;
@@ -973,6 +1050,135 @@ HEADER_HTML = """
             .compose-form { grid-template-columns: 1fr; }
             .form-field-wide { grid-column: auto; }
         }
+
+        /* Operations workspace */
+        :root {
+            --workspace-ink: #18201f;
+            --workspace-muted: #65716f;
+            --workspace-line: rgba(58, 75, 72, .16);
+            --workspace-teal: #087f75;
+            --workspace-teal-dark: #08645e;
+            --workspace-violet: #6d4bc3;
+            --workspace-danger: #c63f4e;
+        }
+        body.theme-glass {
+            color: var(--workspace-ink);
+            background:
+                linear-gradient(122deg, transparent 0 18%, rgba(66, 170, 161, .11) 18% 31%, transparent 31% 67%, rgba(109, 75, 195, .08) 67% 77%, transparent 77%),
+                #edf2f1;
+        }
+        .theme-glass::before {
+            background: linear-gradient(110deg, transparent 0 29%, rgba(255,255,255,.64) 29% 40%, transparent 40% 73%, rgba(107,205,197,.12) 73% 83%, transparent 83%);
+            opacity: .78;
+        }
+        .theme-glass::after { display: none; }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            color: #f7fbfa;
+            border-bottom-color: rgba(255,255,255,.1) !important;
+            background: rgba(24, 32, 31, .92) !important;
+            box-shadow: 0 8px 26px rgba(25, 36, 34, .12) !important;
+            backdrop-filter: blur(20px) saturate(1.25) !important;
+        }
+        .topbar-inner { max-width: 1460px; min-height: 62px; padding: 0 24px; }
+        .brand-mark {
+            width: 36px;
+            height: 36px;
+            border: 1px solid rgba(255,255,255,.24);
+            background: var(--workspace-teal);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+        }
+        .topbar .btn-outline-secondary { color: #f7fbfa; border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.06); }
+        .page-shell { max-width: 1460px; padding: 28px 24px 48px; }
+        .page-header { margin-bottom: 20px; }
+        .page-title { color: var(--workspace-ink); font-size: 1.65rem; line-height: 1.25; }
+        .page-heading { min-width: 0; }
+        .service-state { margin-bottom: 6px; color: var(--workspace-teal-dark); }
+        .runtime-line { display: flex; align-items: center; gap: 8px; margin-top: 9px; flex-wrap: wrap; }
+        .runtime-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            padding: 3px 8px;
+            border: 1px solid var(--workspace-line);
+            border-radius: 6px;
+            color: #485654;
+            background: rgba(255,255,255,.46);
+            font-size: .74rem;
+            font-weight: 750;
+        }
+        .console-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+        .compose-panel { position: static; margin: 0; }
+        .control-column { display: grid; gap: 16px; min-width: 0; }
+        .panel-card, .metric-strip, .login-card {
+            border: 1px solid rgba(255,255,255,.72) !important;
+            border-radius: 8px;
+            background: rgba(255,255,255,.64) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.88), 0 12px 34px rgba(35, 52, 49, .09) !important;
+            backdrop-filter: blur(24px) saturate(1.25) !important;
+        }
+        .theme-glass .topbar::before, .panel-card::before, .metric-strip::before, .login-card::before { display: none; }
+        .panel-header { min-height: 58px; padding: 14px 18px; background: rgba(255,255,255,.28); border-bottom-color: var(--workspace-line); }
+        .panel-heading-group { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+        .route-path { color: var(--workspace-muted); font-size: .75rem; font-weight: 650; }
+        .panel-body { padding: 16px 18px 18px; }
+        .compose-form {
+            display: grid;
+            grid-template-columns: 1.15fr .72fr 1.45fr .72fr 1fr .76fr 1.15fr 1.02fr;
+            align-items: end;
+            gap: 12px;
+        }
+        .compose-form .form-field, .compose-form .form-field-wide { min-width: 0; grid-column: auto; }
+        .form-label { color: #53615f; font-size: .78rem; }
+        .form-control, .form-select { min-height: 44px; border-color: rgba(58,75,72,.2); background: rgba(255,255,255,.66); }
+        .form-control:focus, .form-select:focus { border-color: var(--workspace-teal); box-shadow: 0 0 0 .2rem rgba(8,127,117,.12); }
+        .submit-rule { min-height: 44px; background: var(--workspace-teal); border-color: var(--workspace-teal); }
+        .submit-rule:hover { background: var(--workspace-teal-dark); border-color: var(--workspace-teal-dark); }
+        .metric-strip { margin: 0; grid-template-columns: 1fr 1.25fr 1fr 1fr; }
+        .metric-item { padding: 15px 18px; border-left-color: var(--workspace-line); }
+        .metric-label { color: var(--workspace-muted); font-size: .72rem; }
+        .metric-value { margin-top: 5px; color: var(--workspace-ink); font-size: 1.35rem; }
+        .protocol-key { color: var(--workspace-teal); }
+        .udp-key { color: var(--workspace-violet); }
+        .rules-panel { margin: 0; }
+        .rules-table thead th { padding: 11px 14px; color: var(--workspace-muted); background: rgba(226,234,232,.42); font-size: .72rem; }
+        .rules-table tbody td { padding: 13px 14px; border-color: rgba(58,75,72,.1); }
+        .target-pill { color: #f8fbfa; background: #24312f; }
+        .badge-tcp { background: var(--workspace-teal); }
+        .badge-udp { background: var(--workspace-violet); }
+        .quota-track { width: min(150px, 100%); height: 4px; margin-top: 7px; overflow: hidden; border-radius: 4px; background: rgba(58,75,72,.12); }
+        .quota-fill { height: 100%; border-radius: inherit; background: var(--workspace-teal); }
+        .delete-button { color: var(--workspace-danger); border-color: rgba(198,63,78,.3); }
+        .delete-button:hover { background: var(--workspace-danger); border-color: var(--workspace-danger); }
+        @media (max-width: 1260px) {
+            .compose-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .field-target { grid-column: span 2 !important; }
+            .field-remark { grid-column: span 2 !important; }
+            .field-submit { grid-column: span 2 !important; }
+        }
+        @media (max-width: 820px) {
+            .topbar-inner, .page-shell { padding-left: 14px; padding-right: 14px; }
+            .page-header { align-items: flex-start !important; }
+            .console-layout { display: grid; }
+            .control-column { display: grid; }
+            .metric-strip { grid-row: auto; }
+            .compose-panel { grid-row: auto; }
+            .rules-panel { grid-row: auto; }
+            .compose-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .field-target, .field-remark, .field-submit { grid-column: span 2 !important; }
+        }
+        @media (max-width: 500px) {
+            .page-title { font-size: 1.38rem; }
+            .page-actions { width: auto; }
+            .page-actions .btn { width: auto; }
+            .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .metric-item:nth-child(3) { border-left: 0; }
+            .compose-form { grid-template-columns: 1fr; }
+            .field-target, .field-remark, .field-submit { grid-column: auto !important; }
+            .route-path { display: none; }
+        }
     </style>
 </head>
 <body class="theme-{{ theme }}">
@@ -1009,6 +1215,10 @@ DASHBOARD_HTML = HEADER_HTML + """
         <div class="page-heading">
             <div class="service-state"><span class="service-dot"></span>{{ t.status_online }}</div>
             <h1 class="page-title">{{ t.panel_title }}</h1>
+            <div class="runtime-line">
+                <span class="runtime-chip">{{ t.runtime_mode }} · {{ runtime }} + {{ backend }}</span>
+                <span class="runtime-chip">{{ t.kernel_forwarding }}</span>
+            </div>
         </div>
         <div class="page-actions">
             <a href="/logout" class="btn btn-outline-danger">{{ t.logout }}</a>
@@ -1019,25 +1229,25 @@ DASHBOARD_HTML = HEADER_HTML + """
     <div class="console-layout">
         <aside class="panel-card compose-panel">
             <div class="panel-header">
-                <span>{{ t.add_rule }}</span>
+                <div class="panel-heading-group"><span>{{ t.add_rule }}</span><span class="route-path">{{ t.route_path }}</span></div>
                 <span class="panel-caption">DNAT</span>
             </div>
             <div class="panel-body">
                 <form method="POST" action="/add" class="compose-form">
-                    <div class="form-field form-field-wide"><label class="form-label">{{ t.protocol }}</label>
+                    <div class="form-field field-protocol"><label class="form-label">{{ t.protocol }}</label>
                     <select class="form-select" name="protocol">
                         <option value="tcp">{{ t.tcp_only }}</option>
                         <option value="udp" selected>{{ t.udp_only }}</option>
                         <option value="all">{{ t.dual_stack }}</option>
                     </select>
                     </div>
-                    <div class="form-field"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
-                    <div class="form-field"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
-                    <div class="form-field form-field-wide"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
-                    <div class="form-field form-field-wide"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
-                    <div class="form-field"><label class="form-label">{{ t.quota }}</label><input type="number" min="1" step="1" class="form-control" name="quota_mb" placeholder="MB"></div>
-                    <div class="form-field"><label class="form-label">{{ t.expires_at }}</label><input type="datetime-local" class="form-control" name="expires_at" title="{{ t.expires_ph }}"></div>
-                    <div class="form-field form-field-wide"><button type="submit" class="btn btn-primary submit-rule w-100">{{ t.add_btn }}</button></div>
+                    <div class="form-field field-listener"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
+                    <div class="form-field field-target"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
+                    <div class="form-field field-target-port"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
+                    <div class="form-field field-remark"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
+                    <div class="form-field field-quota"><label class="form-label">{{ t.quota }}</label><input type="number" min="1" step="1" class="form-control" name="quota_mb" placeholder="MB"></div>
+                    <div class="form-field field-expiry"><label class="form-label">{{ t.expires_at }}</label><input type="datetime-local" class="form-control" name="expires_at" title="{{ t.expires_ph }}"></div>
+                    <div class="form-field field-submit"><button type="submit" class="btn btn-primary submit-rule w-100">{{ t.add_btn }}</button></div>
                 </form>
             </div>
         </aside>
@@ -1062,7 +1272,7 @@ DASHBOARD_HTML = HEADER_HTML + """
                                 <td data-label="{{ t.local_port }}"><span class="port-value">{{ rule.local_port }}</span></td>
                                 <td class="target-cell" data-label="{{ t.target_ip }} : {{ t.target_port }}"><span class="target-pill">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
                                 <td class="remark-cell-mobile" data-label="{{ t.remark }}"><div class="remark-cell" title="{{ rule.remark }}">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</div></td>
-                                <td data-label="{{ t.traffic }}"><span class="traffic-value">{{ rule.traffic_text }}</span></td>
+                                <td data-label="{{ t.traffic }}"><span class="traffic-value">{{ rule.traffic_text }}</span>{% if rule.quota_bytes %}<div class="quota-track"><div class="quota-fill" style="width:{{ rule.traffic_percent }}%"></div></div>{% endif %}</td>
                                 <td data-label="{{ t.expires_at }}"><span class="expiry-value">{{ rule.expires_text }}</span></td>
                                 <td class="text-end action-cell" data-label="{{ t.action }}">
                                     <form method="POST" action="/delete" style="display:inline;">
@@ -1071,6 +1281,7 @@ DASHBOARD_HTML = HEADER_HTML + """
                                         <input type="hidden" name="target_ip" value="{{ rule.target_ip }}">
                                         <input type="hidden" name="target_port" value="{{ rule.target_port }}">
                                         <input type="hidden" name="remark" value="{{ rule.remark }}">
+                                        <input type="hidden" name="rule_comment" value="{{ rule.rule_comment }}">
                                         <button type="submit" class="btn btn-sm delete-button" onclick="return confirm('{{ t.confirm_del }}');">{{ t.delete }}</button>
                                     </form>
                                 </td>
@@ -1132,6 +1343,12 @@ def limit_expires_at(limit):
         return str(limit.get("expires_at", "") or "")
     return ""
 
+def limit_base_bytes(limit):
+    return int(limit.get("base_bytes", 0) or 0) if isinstance(limit, dict) else 0
+
+def limit_target_host(limit):
+    return str(limit.get("target_host", "") or "") if isinstance(limit, dict) else ""
+
 def format_expires(value):
     return value.replace("T", " ") + " UTC+8" if value else "不限"
 
@@ -1159,10 +1376,15 @@ def rule_track_id(protocol, local_port, target_ip, target_port, remark):
 def tracking_comment(track_id):
     return TRACK_PREFIX + track_id
 
+def visible_rule_remark(comment):
+    if comment.startswith("iptables-panel | "):
+        return comment[len("iptables-panel | "):]
+    return "" if comment == "iptables-panel" else comment
+
 def get_tracking_bytes():
     usage = {}
     try:
-        res = subprocess.run(['sudo', 'iptables-save', '-c'], capture_output=True, text=True)
+        res = subprocess.run(['iptables-save', '-c'], capture_output=True, text=True)
         for line in res.stdout.splitlines():
             if '-A FORWARD' not in line or TRACK_PREFIX not in line:
                 continue
@@ -1177,21 +1399,38 @@ def get_tracking_bytes():
 
 def add_tracking_rules(protocol, target_ip, target_port, track_id):
     comment = tracking_comment(track_id)
-    subprocess.run(['sudo', 'iptables', '-A', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
-    subprocess.run(['sudo', 'iptables', '-A', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
+    subprocess.run(['iptables', '-A', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
+    subprocess.run(['iptables', '-A', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=True)
+
+def create_forwarding_rule(protocol, local_port, target_ip, target_port, remark, rule_comment=None):
+    rule_comment = remark if rule_comment is None else rule_comment
+    cmd_pre = ['iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', protocol, '--dport', local_port]
+    if rule_comment:
+        cmd_pre.extend(['-m', 'comment', '--comment', rule_comment])
+    cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{target_ip}:{target_port}'])
+    track_id = rule_track_id(protocol, local_port, target_ip, target_port, remark)
+    try:
+        subprocess.run(cmd_pre, check=True)
+        subprocess.run(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-p', protocol, '-d', target_ip, '--dport', target_port, '-j', 'MASQUERADE'], check=True)
+        add_tracking_rules(protocol, target_ip, target_port, track_id)
+        return track_id
+    except Exception:
+        delete_forwarding_rule(protocol, local_port, target_ip, target_port, remark, rule_comment)
+        raise
 
 def delete_tracking_rules(protocol, target_ip, target_port, track_id):
     comment = tracking_comment(track_id)
-    subprocess.run(['sudo', 'iptables', '-D', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
-    subprocess.run(['sudo', 'iptables', '-D', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
+    subprocess.run(['iptables', '-D', 'FORWARD', '-p', protocol, '-d', target_ip, '--dport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
+    subprocess.run(['iptables', '-D', 'FORWARD', '-p', protocol, '-s', target_ip, '--sport', target_port, '-m', 'comment', '--comment', comment, '-j', 'ACCEPT'], check=False)
 
-def delete_forwarding_rule(protocol, local_port, target_ip, target_port, remark):
-    cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', protocol, '--dport', local_port]
-    if remark:
-        cmd_pre.extend(['-m', 'comment', '--comment', remark])
+def delete_forwarding_rule(protocol, local_port, target_ip, target_port, remark, rule_comment=None):
+    rule_comment = remark if rule_comment is None else rule_comment
+    cmd_pre = ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', protocol, '--dport', local_port]
+    if rule_comment:
+        cmd_pre.extend(['-m', 'comment', '--comment', rule_comment])
     cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{target_ip}:{target_port}'])
     subprocess.run(cmd_pre, check=False)
-    subprocess.run(['sudo', 'iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', protocol, '-d', target_ip, '--dport', target_port, '-j', 'MASQUERADE'], check=False)
+    subprocess.run(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-p', protocol, '-d', target_ip, '--dport', target_port, '-j', 'MASQUERADE'], check=False)
     delete_tracking_rules(protocol, target_ip, target_port, rule_track_id(protocol, local_port, target_ip, target_port, remark))
 
 def remove_quota(track_id):
@@ -1210,16 +1449,75 @@ def enforce_quotas_once():
         quota = limit_quota_bytes(limit)
         expires_at = limit_expires_at(limit)
         if (quota and rule['traffic_bytes'] >= quota) or is_expired(expires_at):
-            delete_forwarding_rule(rule['protocol'].lower(), rule['local_port'], rule['target_ip'], rule['target_port'], rule['remark'])
+            delete_forwarding_rule(rule['protocol'].lower(), rule['local_port'], rule['target_ip'], rule['target_port'], rule['remark'], rule['rule_comment'])
             quotas.pop(rule['track_id'], None)
             changed = True
     if changed:
         save_quotas(quotas)
 
+def refresh_domain_rules_once():
+    quotas = load_quotas()
+    changed = False
+    for rule in get_parsed_rules():
+        limit = quotas.get(rule['track_id'], {})
+        target_host = limit_target_host(limit)
+        inferred_host = False
+        if not target_host:
+            domain_match = re.search(r'\[([A-Za-z0-9._-]+)\]\s*$', rule['remark'])
+            target_host = domain_match.group(1) if domain_match else ""
+            inferred_host = bool(target_host)
+        if not target_host:
+            continue
+        try:
+            resolved_ips = socket.gethostbyname_ex(target_host)[2]
+        except OSError:
+            continue
+        if not resolved_ips:
+            continue
+        if rule['target_ip'] in resolved_ips:
+            if not isinstance(limit, dict) or limit_target_host(limit) != target_host:
+                quotas[rule['track_id']] = {
+                    "quota_bytes": limit_quota_bytes(limit),
+                    "expires_at": limit_expires_at(limit),
+                    "base_bytes": limit_base_bytes(limit),
+                    "target_host": target_host,
+                }
+                changed = True
+            continue
+        if inferred_host:
+            continue
+        new_ip = resolved_ips[0]
+
+        protocol = rule['protocol'].lower()
+        new_track_id = rule_track_id(protocol, rule['local_port'], new_ip, rule['target_port'], rule['remark'])
+        try:
+            create_forwarding_rule(protocol, rule['local_port'], new_ip, rule['target_port'], rule['remark'], rule['rule_comment'])
+            delete_forwarding_rule(protocol, rule['local_port'], rule['target_ip'], rule['target_port'], rule['remark'], rule['rule_comment'])
+        except Exception as exc:
+            delete_forwarding_rule(protocol, rule['local_port'], new_ip, rule['target_port'], rule['remark'], rule['rule_comment'])
+            print(f"domain refresh failed for {target_host}: {exc}")
+            continue
+
+        quotas.pop(rule['track_id'], None)
+        quotas[new_track_id] = {
+            "quota_bytes": limit_quota_bytes(limit),
+            "expires_at": limit_expires_at(limit),
+            "base_bytes": rule['traffic_bytes'],
+            "target_host": target_host,
+        }
+        changed = True
+    if changed:
+        save_quotas(quotas)
+
 def quota_watcher():
+    cycles = 0
     while True:
         try:
-            enforce_quotas_once()
+            with RULE_LOCK:
+                enforce_quotas_once()
+                cycles += 1
+                if cycles % 2 == 0:
+                    refresh_domain_rules_once()
         except Exception as e:
             print(e)
         time.sleep(30)
@@ -1229,7 +1527,7 @@ def get_parsed_rules():
     traffic_bytes = get_tracking_bytes()
     quotas = load_quotas()
     try:
-        res = subprocess.run(['sudo', 'iptables-save', '-t', 'nat'], capture_output=True, text=True)
+        res = subprocess.run(['iptables-save', '-t', 'nat'], capture_output=True, text=True)
         for line in res.stdout.split('\n'):
             if line.startswith('-A PREROUTING') and '-j DNAT' in line:
                 proto_m = re.search(r'-p\s+(tcp|udp)', line)
@@ -1242,10 +1540,11 @@ def get_parsed_rules():
                     local_port = lport_m.group(1)
                     target_ip = target_m.group(1)
                     target_port = target_m.group(2)
-                    remark = remark_m.group(1) if remark_m else ''
+                    rule_comment = remark_m.group(1) if remark_m else ''
+                    remark = visible_rule_remark(rule_comment)
                     track_id = rule_track_id(protocol, local_port, target_ip, target_port, remark)
-                    used_bytes = traffic_bytes.get(track_id, 0)
                     limit = quotas.get(track_id, 0)
+                    used_bytes = traffic_bytes.get(track_id, 0) + limit_base_bytes(limit)
                     quota_bytes = limit_quota_bytes(limit)
                     expires_at = limit_expires_at(limit)
                     rules_list.append({
@@ -1254,9 +1553,11 @@ def get_parsed_rules():
                         'target_ip': target_ip,
                         'target_port': target_port,
                         'remark': remark,
+                        'rule_comment': rule_comment,
                         'track_id': track_id,
                         'traffic_bytes': used_bytes,
                         'quota_bytes': quota_bytes,
+                        'traffic_percent': min(100, round(used_bytes * 100 / quota_bytes)) if quota_bytes else 0,
                         'expires_at': expires_at,
                         'traffic_text': f"{format_bytes(used_bytes)} / {format_bytes(quota_bytes) if quota_bytes else '不限'}",
                         'expires_text': format_expires(expires_at)
@@ -1267,12 +1568,10 @@ def get_parsed_rules():
 def valid_port(value):
     return value and value.isdigit() and 1 <= int(value) <= 65535
 
-def rule_exists(protocol, local_port, target_ip, target_port):
+def rule_exists(protocol, local_port):
     return any(
         rule['protocol'].lower() == protocol
         and rule['local_port'] == local_port
-        and rule['target_ip'] == target_ip
-        and rule['target_port'] == target_port
         for rule in get_parsed_rules()
     )
 
@@ -1298,9 +1597,10 @@ def index():
     if not session.get('logged_in'): return redirect(url_for('login'))
     rules = get_parsed_rules()
     total_traffic_text = format_bytes(sum(rule.get('traffic_bytes', 0) for rule in rules))
-    return render_template_string(DASHBOARD_HTML, t=get_t(), theme=PANEL_THEME, rules=rules, total_traffic_text=total_traffic_text, message=request.args.get('msg'), status=request.args.get('status', 'success'))
+    return render_template_string(DASHBOARD_HTML, t=get_t(), theme=PANEL_THEME, runtime="Python", backend="iptables", rules=rules, total_traffic_text=total_traffic_text, message=request.args.get('msg'), status=request.args.get('status', 'success'))
 
 @app.route('/add', methods=['POST'])
+@serialized_rule_change
 def add_rule():
     if not session.get('logged_in'): return redirect(url_for('login'))
     t = get_t()
@@ -1325,63 +1625,91 @@ def add_rule():
         remark = f"{remark} [{t_input}]".strip()
     
     protos = ['tcp', 'udp'] if p == 'all' else [p]
-    if any(rule_exists(proto, l_port, t_ip, t_port) for proto in protos):
+    if any(rule_exists(proto, l_port) for proto in protos):
         return redirect(url_for('index', msg=t['err_duplicate'], status="warning"))
 
+    created_rules = []
     try:
         quotas = load_quotas()
         for proto in protos:
-            cmd_pre = ['sudo', 'iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', l_port]
-            if remark: cmd_pre.extend(['-m', 'comment', '--comment', remark])
-            cmd_pre.extend(['-j', 'DNAT', '--to-destination', f'{t_ip}:{t_port}'])
-            subprocess.run(cmd_pre, check=True)
-            
-            subprocess.run(['sudo', 'iptables', '-t', 'nat', '-A', 'POSTROUTING', '-p', proto, '-d', t_ip, '--dport', t_port, '-j', 'MASQUERADE'], check=True)
-            track_id = rule_track_id(proto, l_port, t_ip, t_port, remark)
-            add_tracking_rules(proto, t_ip, t_port, track_id)
-            if quota_bytes or expires_at:
+            track_id = create_forwarding_rule(proto, l_port, t_ip, t_port, remark)
+            created_rules.append((proto, track_id))
+            if quota_bytes or expires_at or t_ip != t_input:
                 quotas[track_id] = {
                     "quota_bytes": quota_bytes,
                     "expires_at": expires_at,
+                    "base_bytes": 0,
+                    "target_host": t_input if t_ip != t_input else "",
                 }
         save_quotas(quotas)
         return redirect(url_for('index', msg=t['add_success'], status="success"))
-    except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
+    except Exception as e:
+        for proto, _track_id in reversed(created_rules):
+            delete_forwarding_rule(proto, l_port, t_ip, t_port, remark)
+        return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
 @app.route('/delete', methods=['POST'])
+@serialized_rule_change
 def delete_rule():
     if not session.get('logged_in'): return redirect(url_for('login'))
     t = get_t()
     p, l_port, t_ip, t_port, remark = request.form.get('protocol'), request.form.get('local_port'), request.form.get('target_ip'), request.form.get('target_port'), request.form.get('remark', '')
+    rule_comment = request.form.get('rule_comment', remark)
     try:
         track_id = rule_track_id(p, l_port, t_ip, t_port, remark)
-        delete_forwarding_rule(p, l_port, t_ip, t_port, remark)
+        delete_forwarding_rule(p, l_port, t_ip, t_port, remark, rule_comment)
         remove_quota(track_id)
         return redirect(url_for('index', msg=t['del_success'], status="warning"))
     except Exception as e: return redirect(url_for('index', msg=f"Failed: {e}", status="danger"))
 
+threading.Thread(target=quota_watcher, daemon=True).start()
+
 if __name__ == '__main__':
-    subprocess.run(['sudo', 'sysctl', '-w', 'net.ipv4.ip_forward=1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    threading.Thread(target=quota_watcher, daemon=True).start()
-    app.run(host='0.0.0.0', port=PANEL_PORT)
+    subprocess.run(['sysctl', '-w', 'net.ipv4.ip_forward=1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    app.run(host='0.0.0.0', port=PANEL_PORT, threaded=True, use_reloader=False)
 EOF
 
-echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-sysctl -p > /dev/null 2>&1
+python3 -m py_compile "$INSTALL_DIR/panel.py.new"
+mv -f "$INSTALL_DIR/panel.py.new" "$INSTALL_DIR/panel.py"
+
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-iptables-panel.conf
+sysctl -p /etc/sysctl.d/99-iptables-panel.conf > /dev/null 2>&1 || true
+
+mkdir -p "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR"
+PANEL_USER_HEX=$(hex_encode "$PANEL_USER")
+PANEL_PASSWORD_HEX=$(hex_encode "$PANEL_PASS")
+cat << EOF > "$CONFIG_FILE"
+PANEL_CHANNEL=stable
+PANEL_RUNTIME=python
+PANEL_BACKEND=iptables
+PANEL_THEME=$PANEL_THEME
+PANEL_PORT=$PANEL_PORT
+PANEL_USER_HEX=$PANEL_USER_HEX
+PANEL_PASSWORD_HEX=$PANEL_PASSWORD_HEX
+EOF
+chmod 600 "$CONFIG_FILE"
 
 echo "⚙️ 正在配置系统服务..."
 cat << EOF > /etc/systemd/system/iptables-panel.service
 [Unit]
 Description=Iptables Forwarding Web Panel
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/usr/bin/python3 $INSTALL_DIR/panel.py --port $PANEL_PORT --user $PANEL_USER --password $PANEL_PASS --theme $PANEL_THEME
+EnvironmentFile=$CONFIG_FILE
+ExecStart=/usr/bin/python3 -m gunicorn --workers 1 --threads 4 --timeout 30 --bind 0.0.0.0:${PANEL_PORT} panel:app
 Restart=always
 RestartSec=3
+UMask=0077
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=$INSTALL_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -1390,6 +1718,20 @@ EOF
 systemctl daemon-reload
 systemctl enable iptables-panel > /dev/null 2>&1
 systemctl restart iptables-panel
+PANEL_HEALTHY=0
+for _attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if systemctl is-active --quiet iptables-panel \
+    && curl -fsS --max-time 2 "http://127.0.0.1:$PANEL_PORT/login" > /dev/null 2>&1; then
+    PANEL_HEALTHY=1
+    break
+  fi
+  sleep 1
+done
+if [ "$PANEL_HEALTHY" != "1" ]; then
+  echo "❌ 面板服务启动失败，最近日志如下："
+  journalctl -u iptables-panel -n 20 --no-pager
+  exit 1
+fi
 
 echo "UI theme: $PANEL_THEME"
 echo "====================================================="

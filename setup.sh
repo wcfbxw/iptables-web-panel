@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SERVICE_FILE="/etc/systemd/system/iptables-panel.service"
+CONFIG_FILE="/etc/iptables-panel/panel.env"
 REPOSITORY_RAW_URL="${PANEL_INSTALL_BASE_URL:-https://raw.githubusercontent.com/wcfbxw/iptables-web-panel/main}"
 INSTALL_CHANNEL=""
 TEMP_DIR=""
@@ -32,6 +33,19 @@ detect_installed_panel() {
   INSTALLED_CHANNEL=""
   INSTALLED_RUNTIME=""
   INSTALLED_BACKEND=""
+
+  if [ -f "$SERVICE_FILE" ] && [ -f "$CONFIG_FILE" ]; then
+    INSTALLED_CHANNEL=$(sed -n 's/^PANEL_CHANNEL=//p' "$CONFIG_FILE" | tail -n 1)
+    INSTALLED_RUNTIME=$(sed -n 's/^PANEL_RUNTIME=//p' "$CONFIG_FILE" | tail -n 1)
+    INSTALLED_BACKEND=$(sed -n 's/^PANEL_BACKEND=//p' "$CONFIG_FILE" | tail -n 1)
+    case "$INSTALLED_RUNTIME" in
+      python) INSTALLED_RUNTIME="Python" ;;
+      rust) INSTALLED_RUNTIME="Rust" ;;
+    esac
+    if [ -n "$INSTALLED_CHANNEL" ] && [ -n "$INSTALLED_RUNTIME" ] && [ -n "$INSTALLED_BACKEND" ]; then
+      return
+    fi
+  fi
 
   if [ ! -f "$SERVICE_FILE" ]; then
     return

@@ -1,138 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Traffic forwarding liquid glass control panel preview">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Traffic forwarding liquid glass operations workspace preview">
   <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#dbeef1"/>
-      <stop offset=".48" stop-color="#f4f7f8"/>
-      <stop offset=".76" stop-color="#e3eef0"/>
-      <stop offset="1" stop-color="#eef0f7"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".78"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity=".42"/>
-    </linearGradient>
-    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#10233e"/>
-      <stop offset="1" stop-color="#285c68"/>
-    </linearGradient>
-    <linearGradient id="primary" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#176f7c"/>
-      <stop offset="1" stop-color="#188b88"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#22374e" flood-opacity=".12"/>
-    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3efed"/><stop offset=".52" stop-color="#f2f5f4"/><stop offset="1" stop-color="#eceaf4"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".78"/><stop offset="1" stop-color="#ffffff" stop-opacity=".48"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="13" flood-color="#233431" flood-opacity=".10"/></filter>
   </defs>
-
-  <rect width="1200" height="720" fill="url(#background)"/>
-  <path d="M0 88 L210 0 H385 L112 310 L0 334 Z" fill="#5cb8be" opacity=".13"/>
-  <path d="M760 0 H960 L678 382 H494 Z" fill="#ffffff" opacity=".38"/>
-  <path d="M1010 0 H1200 V280 L978 372 H838 Z" fill="#8b72d2" opacity=".10"/>
-
-  <rect x="0" y="0" width="1200" height="70" fill="#f2f7fa" fill-opacity=".76" stroke="#738497" stroke-opacity=".16"/>
-  <rect x="34" y="15" width="40" height="40" rx="8" fill="url(#brand)" stroke="#ffffff" stroke-opacity=".76"/>
-  <text x="46" y="41" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="800">IP</text>
-  <text x="90" y="41" fill="#10233e" font-family="Arial, sans-serif" font-size="17" font-weight="800">流量中转管理面板</text>
-  <circle cx="1027" cy="35" r="5" fill="#18a46c"/>
-  <text x="1040" y="40" fill="#477177" font-family="Arial, sans-serif" font-size="13" font-weight="700">服务在线</text>
-  <rect x="1120" y="17" width="50" height="36" rx="8" fill="#ffffff" fill-opacity=".48" stroke="#738497" stroke-opacity=".25"/>
-  <text x="1133" y="40" fill="#10233e" font-family="Arial, sans-serif" font-size="13" font-weight="700">退出</text>
-
-  <text x="34" y="145" fill="#10233e" font-family="Arial, sans-serif" font-size="27" font-weight="800">流量中转管理面板</text>
-
-  <g filter="url(#shadow)">
-    <rect x="34" y="174" width="330" height="510" rx="8" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".82"/>
-    <rect x="384" y="174" width="782" height="104" rx="8" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".82"/>
-    <rect x="384" y="298" width="782" height="386" rx="8" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".82"/>
-  </g>
-
-  <line x1="34" y1="230" x2="364" y2="230" stroke="#738497" stroke-opacity=".15"/>
-  <text x="54" y="208" fill="#10233e" font-family="Arial, sans-serif" font-size="16" font-weight="800">新建转发规则</text>
-  <text x="311" y="208" fill="#748293" font-family="Arial, sans-serif" font-size="11" font-weight="700">DNAT</text>
-
-  <g font-family="Arial, sans-serif">
-    <text x="54" y="260" fill="#586a7d" font-size="11" font-weight="700">转发协议</text>
-    <rect x="54" y="272" width="290" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <text x="67" y="298" fill="#10233e" font-size="13">TCP + UDP 双栈</text>
-    <path d="M322 289 l6 6 l6 -6" fill="none" stroke="#586a7d" stroke-width="1.5"/>
-
-    <text x="54" y="340" fill="#586a7d" font-size="11" font-weight="700">监听端口</text>
-    <text x="207" y="340" fill="#586a7d" font-size="11" font-weight="700">目标端口</text>
-    <rect x="54" y="352" width="137" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <rect x="207" y="352" width="137" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <text x="67" y="378" fill="#10233e" font-size="13">38342</text>
-    <text x="220" y="378" fill="#10233e" font-size="13">16589</text>
-
-    <text x="54" y="420" fill="#586a7d" font-size="11" font-weight="700">目标 IP 或域名</text>
-    <rect x="54" y="432" width="290" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <text x="67" y="458" fill="#10233e" font-size="13">38.244.38.29</text>
-
-    <text x="54" y="500" fill="#586a7d" font-size="11" font-weight="700">备注信息</text>
-    <rect x="54" y="512" width="290" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <text x="67" y="538" fill="#6a798a" font-size="13">Web service</text>
-
-    <text x="54" y="580" fill="#586a7d" font-size="11" font-weight="700">流量上限</text>
-    <text x="207" y="580" fill="#586a7d" font-size="11" font-weight="700">到期时间</text>
-    <rect x="54" y="592" width="137" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <rect x="207" y="592" width="137" height="42" rx="8" fill="#ffffff" fill-opacity=".54" stroke="#738497" stroke-opacity=".22"/>
-    <text x="67" y="618" fill="#10233e" font-size="13">10240 MB</text>
-    <text x="220" y="618" fill="#10233e" font-size="12">UTC+8</text>
-
-    <rect x="54" y="650" width="290" height="34" rx="8" fill="url(#primary)"/>
-    <text x="143" y="672" fill="#ffffff" font-size="13" font-weight="800">添加转发规则</text>
-  </g>
-
-  <g font-family="Arial, sans-serif">
-    <line x1="580" y1="174" x2="580" y2="278" stroke="#738497" stroke-opacity=".14"/>
-    <line x1="795" y1="174" x2="795" y2="278" stroke="#738497" stroke-opacity=".14"/>
-    <line x1="980" y1="174" x2="980" y2="278" stroke="#738497" stroke-opacity=".14"/>
-    <text x="405" y="207" fill="#6a798a" font-size="11" font-weight="700">总规则</text>
-    <text x="405" y="250" fill="#10233e" font-size="27" font-weight="800">12</text>
-    <text x="602" y="207" fill="#6a798a" font-size="11" font-weight="700">总流量</text>
-    <text x="602" y="250" fill="#10233e" font-size="25" font-weight="800">8.4 GB</text>
-    <text x="817" y="207" fill="#6a798a" font-size="11" font-weight="700">TCP 规则</text>
-    <text x="817" y="250" fill="#168798" font-size="12" font-weight="800">TCP</text>
-    <text x="854" y="250" fill="#10233e" font-size="25" font-weight="800">8</text>
-    <text x="1002" y="207" fill="#6a798a" font-size="11" font-weight="700">UDP 规则</text>
-    <text x="1002" y="250" fill="#7654b8" font-size="12" font-weight="800">UDP</text>
-    <text x="1042" y="250" fill="#10233e" font-size="25" font-weight="800">4</text>
-  </g>
-
-  <line x1="384" y1="354" x2="1166" y2="354" stroke="#738497" stroke-opacity=".15"/>
-  <text x="405" y="333" fill="#10233e" font-family="Arial, sans-serif" font-size="16" font-weight="800">当前生效规则</text>
-  <rect x="1115" y="315" width="30" height="24" rx="6" fill="#176f7c" fill-opacity=".10"/>
-  <text x="1123" y="332" fill="#176f7c" font-family="Arial, sans-serif" font-size="12" font-weight="800">12</text>
-
-  <g font-family="Arial, sans-serif">
-    <rect x="384" y="354" width="782" height="42" fill="#eaf0f4" fill-opacity=".42"/>
-    <text x="405" y="379" fill="#6a798a" font-size="10" font-weight="800">协议</text>
-    <text x="474" y="379" fill="#6a798a" font-size="10" font-weight="800">监听端口</text>
-    <text x="570" y="379" fill="#6a798a" font-size="10" font-weight="800">目标地址</text>
-    <text x="790" y="379" fill="#6a798a" font-size="10" font-weight="800">备注</text>
-    <text x="890" y="379" fill="#6a798a" font-size="10" font-weight="800">总流量</text>
-    <text x="1000" y="379" fill="#6a798a" font-size="10" font-weight="800">到期时间</text>
-
-    <line x1="384" y1="456" x2="1166" y2="456" stroke="#738497" stroke-opacity=".12"/>
-    <rect x="405" y="416" width="44" height="24" rx="6" fill="#2262b7"/>
-    <text x="415" y="433" fill="#ffffff" font-size="11" font-weight="800">TCP</text>
-    <text x="474" y="433" fill="#10233e" font-size="14" font-weight="800">38342</text>
-    <rect x="570" y="411" width="177" height="34" rx="6" fill="#10233e"/>
-    <text x="582" y="433" fill="#ffffff" font-size="12" font-weight="700">38.244.38.29 : 16589</text>
-    <text x="790" y="433" fill="#6a798a" font-size="12">Web service</text>
-    <text x="890" y="433" fill="#2f5660" font-size="12" font-weight="700">1.28 / 10 GB</text>
-    <text x="1000" y="433" fill="#657386" font-size="11">2026-09-01</text>
-    <rect x="1111" y="413" width="42" height="30" rx="8" fill="#ffffff" fill-opacity=".40" stroke="#c94a58" stroke-opacity=".32"/>
-    <text x="1121" y="433" fill="#b53746" font-size="11" font-weight="700">删除</text>
-
-    <line x1="384" y1="518" x2="1166" y2="518" stroke="#738497" stroke-opacity=".12"/>
-    <rect x="405" y="478" width="44" height="24" rx="6" fill="#7654b8"/>
-    <text x="414" y="495" fill="#ffffff" font-size="11" font-weight="800">UDP</text>
-    <text x="474" y="495" fill="#10233e" font-size="14" font-weight="800">443</text>
-    <rect x="570" y="473" width="177" height="34" rx="6" fill="#10233e"/>
-    <text x="582" y="495" fill="#ffffff" font-size="12" font-weight="700">edge.example.com : 8443</text>
-    <text x="790" y="495" fill="#6a798a" font-size="12">Hysteria2</text>
-    <text x="890" y="495" fill="#2f5660" font-size="12" font-weight="700">863 MB / 不限</text>
-    <text x="1000" y="495" fill="#657386" font-size="11">不限</text>
-    <rect x="1111" y="475" width="42" height="30" rx="8" fill="#ffffff" fill-opacity=".40" stroke="#c94a58" stroke-opacity=".32"/>
-    <text x="1121" y="495" fill="#b53746" font-size="11" font-weight="700">删除</text>
-  </g>
+  <rect width="1200" height="720" fill="url(#bg)"/><path d="M0 86 L220 0 H410 L160 270 L0 294 Z" fill="#42aaa1" opacity=".10"/><path d="M735 0 H965 L730 315 H520 Z" fill="#fff" opacity=".48"/><path d="M1030 0 H1200 V280 L982 350 H850 Z" fill="#6d4bc3" opacity=".08"/>
+  <rect width="1200" height="62" fill="#18201f" fill-opacity=".94"/><rect x="28" y="13" width="36" height="36" rx="8" fill="#087f75" stroke="#fff" stroke-opacity=".24"/><text x="39" y="37" fill="#fff" font-family="Arial" font-size="14" font-weight="800">IP</text><text x="78" y="37" fill="#f7fbfa" font-family="Arial" font-size="16" font-weight="800">流量中转管理面板</text><circle cx="1050" cy="31" r="5" fill="#25bb83"/><text x="1062" y="36" fill="#bde6df" font-family="Arial" font-size="12" font-weight="700">服务在线</text><rect x="1130" y="14" width="45" height="34" rx="7" fill="#fff" fill-opacity=".06" stroke="#fff" stroke-opacity=".24"/><text x="1141" y="36" fill="#f7fbfa" font-family="Arial" font-size="12">退出</text>
+  <text x="34" y="112" fill="#087f75" font-family="Arial" font-size="11" font-weight="700">● 服务在线</text><text x="34" y="142" fill="#18201f" font-family="Arial" font-size="26" font-weight="800">端口转发控制台</text><rect x="34" y="155" width="126" height="25" rx="6" fill="#fff" fill-opacity=".52" stroke="#3a4b48" stroke-opacity=".16"/><text x="44" y="172" fill="#485654" font-family="Arial" font-size="10" font-weight="700">Python + iptables</text><rect x="168" y="155" width="76" height="25" rx="6" fill="#fff" fill-opacity=".52" stroke="#3a4b48" stroke-opacity=".16"/><text x="179" y="172" fill="#485654" font-family="Arial" font-size="10" font-weight="700">内核转发</text>
+  <g filter="url(#shadow)"><rect x="34" y="200" width="1132" height="184" rx="8" fill="url(#glass)" stroke="#fff" stroke-opacity=".82"/><rect x="34" y="400" width="1132" height="94" rx="8" fill="url(#glass)" stroke="#fff" stroke-opacity=".82"/><rect x="34" y="510" width="1132" height="184" rx="8" fill="url(#glass)" stroke="#fff" stroke-opacity=".82"/></g>
+  <line x1="34" y1="258" x2="1166" y2="258" stroke="#3a4b48" stroke-opacity=".14"/><text x="52" y="236" fill="#18201f" font-family="Arial" font-size="15" font-weight="800">新建转发规则</text><text x="174" y="236" fill="#65716f" font-family="Arial" font-size="11" font-weight="700">监听入口 → 目标出口</text><text x="1114" y="236" fill="#65716f" font-family="Arial" font-size="11" font-weight="700">DNAT</text>
+  <g font-family="Arial" font-size="10" fill="#53615f" font-weight="700"><text x="52" y="282">协议</text><text x="181" y="282">监听端口</text><text x="285" y="282">目标 IP / 域名</text><text x="503" y="282">目标端口</text><text x="608" y="282">备注</text><text x="773" y="282">流量上限</text><text x="883" y="282">到期时间 UTC+8</text></g>
+  <g fill="#fff" fill-opacity=".66" stroke="#3a4b48" stroke-opacity=".2"><rect x="52" y="292" width="116" height="44" rx="7"/><rect x="181" y="292" width="91" height="44" rx="7"/><rect x="285" y="292" width="205" height="44" rx="7"/><rect x="503" y="292" width="92" height="44" rx="7"/><rect x="608" y="292" width="152" height="44" rx="7"/><rect x="773" y="292" width="97" height="44" rx="7"/><rect x="883" y="292" width="158" height="44" rx="7"/></g>
+  <g font-family="Arial" font-size="11" fill="#18201f"><text x="63" y="319">TCP + UDP</text><text x="192" y="319">38342</text><text x="296" y="319">edge.example.com</text><text x="514" y="319">16589</text><text x="619" y="319">HK route</text><text x="784" y="319">10240 MB</text><text x="894" y="319">2026-09-30 18:00</text></g><rect x="1054" y="292" width="94" height="44" rx="7" fill="#087f75"/><text x="1074" y="319" fill="#fff" font-family="Arial" font-size="12" font-weight="800">添加规则</text>
+  <line x1="316" y1="400" x2="316" y2="494" stroke="#3a4b48" stroke-opacity=".13"/><line x1="598" y1="400" x2="598" y2="494" stroke="#3a4b48" stroke-opacity=".13"/><line x1="880" y1="400" x2="880" y2="494" stroke="#3a4b48" stroke-opacity=".13"/>
+  <g font-family="Arial"><text x="54" y="429" fill="#65716f" font-size="10" font-weight="700">总规则</text><text x="54" y="462" fill="#18201f" font-size="24" font-weight="800">2</text><text x="336" y="429" fill="#65716f" font-size="10" font-weight="700">总流量</text><text x="336" y="462" fill="#18201f" font-size="24" font-weight="800">6.8 GB</text><text x="618" y="429" fill="#65716f" font-size="10" font-weight="700">TCP 规则</text><text x="618" y="462" fill="#087f75" font-size="20" font-weight="800">TCP  1</text><text x="900" y="429" fill="#65716f" font-size="10" font-weight="700">UDP 规则</text><text x="900" y="462" fill="#6d4bc3" font-size="20" font-weight="800">UDP  1</text></g>
+  <line x1="34" y1="566" x2="1166" y2="566" stroke="#3a4b48" stroke-opacity=".14"/><text x="52" y="544" fill="#18201f" font-family="Arial" font-size="15" font-weight="800">当前生效规则</text><rect x="1120" y="526" width="28" height="24" rx="6" fill="#087f75" fill-opacity=".10"/><text x="1131" y="543" fill="#087f75" font-family="Arial" font-size="11" font-weight="800">2</text>
+  <g font-family="Arial" font-size="10" fill="#65716f" font-weight="700"><text x="52" y="590">协议</text><text x="135" y="590">监听端口</text><text x="246" y="590">目标地址</text><text x="500" y="590">备注</text><text x="660" y="590">总流量（上行 + 下行）</text><text x="885" y="590">到期时间</text><text x="1090" y="590">操作</text></g><line x1="34" y1="606" x2="1166" y2="606" stroke="#3a4b48" stroke-opacity=".1"/>
+  <rect x="52" y="624" width="43" height="27" rx="6" fill="#087f75"/><text x="62" y="643" fill="#fff" font-family="Arial" font-size="11" font-weight="800">TCP</text><text x="135" y="643" fill="#18201f" font-family="Arial" font-size="13" font-weight="800">38342</text><rect x="246" y="618" width="173" height="35" rx="6" fill="#24312f"/><text x="258" y="641" fill="#fff" font-family="Arial" font-size="11" font-weight="700">38.244.38.29:16589</text><text x="500" y="641" fill="#65716f" font-family="Arial" font-size="11">HK route [edge.example.com]</text><text x="660" y="637" fill="#315c56" font-family="Arial" font-size="11" font-weight="700">6.8 GB / 10 GB</text><rect x="660" y="646" width="126" height="4" rx="2" fill="#3a4b48" fill-opacity=".12"/><rect x="660" y="646" width="86" height="4" rx="2" fill="#087f75"/><text x="885" y="641" fill="#65716f" font-family="Arial" font-size="11">2026-09-30 UTC+8</text><rect x="1090" y="620" width="58" height="31" rx="7" fill="#fff" fill-opacity=".42" stroke="#c63f4e" stroke-opacity=".34"/><text x="1107" y="641" fill="#c63f4e" font-family="Arial" font-size="11" font-weight="700">删除</text>
 </svg>
