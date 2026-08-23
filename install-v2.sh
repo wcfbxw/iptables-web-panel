@@ -236,6 +236,7 @@ import datetime
 import functools
 import hashlib
 import html
+import ipaddress
 import os
 import re
 import socket
@@ -288,7 +289,7 @@ CSS = """
 label{display:block;margin-bottom:6px;color:#586a7d;font-size:.79rem;font-weight:750}input,select{width:100%;min-height:44px;padding:8px 10px;border:1px solid rgba(115,132,151,.26);border-radius:8px;color:#10233e;background:rgba(255,255,255,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.76);font:inherit}input:focus,select:focus{outline:0;border-color:#168798;box-shadow:0 0 0 3px rgba(22,135,152,.12)}
 button,.btn{min-height:38px;padding:8px 13px;border:1px solid transparent;border-radius:8px;font:inherit;font-weight:750;text-decoration:none;cursor:pointer}.primary{width:100%;min-height:46px;color:#fff;border-color:#176f7c;background:linear-gradient(135deg,#176f7c,#188b88);box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 12px 24px rgba(23,111,124,.18)}.ghost{color:#10233e;border-color:rgba(115,132,151,.26);background:rgba(255,255,255,.48)}.danger{color:#b53746;border-color:rgba(201,74,88,.34);background:rgba(255,255,255,.42)}.danger:hover{color:#fff;background:#b53746}
 .metrics{display:grid;grid-template-columns:1.1fr 1.4fr 1fr 1fr}.metric{min-width:0;padding:18px 20px;border-left:1px solid rgba(115,132,151,.14)}.metric:first-child{border-left:0}.muted{color:#6a798a}.metric .muted{font-size:.75rem;font-weight:700;text-transform:uppercase}.num{margin-top:8px;font-size:1.55rem;line-height:1.1;font-weight:850}.proto-key{margin-right:8px;color:#168798;font-size:.72rem}.proto-key.udp{color:#7654b8}.rule-count{min-width:28px;height:26px;padding:0 8px;display:inline-grid;place-items:center;border-radius:6px;color:#176f7c;background:rgba(23,111,124,.09);font-size:.78rem}
-.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:14px;border-bottom:1px solid rgba(115,132,151,.12);text-align:left}th{color:#6a798a;background:rgba(234,240,244,.42);font-size:.72rem;text-transform:uppercase;white-space:nowrap}tr:last-child td{border-bottom:0}.pill{display:inline-block;padding:5px 8px;border-radius:6px;color:#fff;background:#10233e;font-size:.84rem;font-weight:750;white-space:nowrap}.tcp{min-width:44px;text-align:center;background:#2262b7}.udp{min-width:44px;text-align:center;background:#7654b8}.port{font-weight:850}.traffic{color:#2f5660;font-weight:700;white-space:nowrap}.expiry{color:#657386;font-size:.83rem;white-space:nowrap}.action{text-align:right}.msg{margin-bottom:18px;padding:12px 14px;border:1px solid rgba(22,135,152,.18);border-radius:8px;color:#176f7c;background:rgba(255,255,255,.48);font-weight:700}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:14px;border-bottom:1px solid rgba(115,132,151,.12);text-align:left}th{color:#6a798a;background:rgba(234,240,244,.42);font-size:.72rem;text-transform:uppercase;white-space:nowrap}tr:last-child td{border-bottom:0}.pill{display:inline-block;padding:5px 8px;border-radius:6px;color:#fff;background:#10233e;font-size:.84rem;font-weight:750;white-space:nowrap}.tcp{min-width:44px;text-align:center;background:#2262b7}.udp{min-width:44px;text-align:center;background:#7654b8}.port{font-weight:850;overflow-wrap:anywhere}.traffic{color:#2f5660;font-weight:700;white-space:nowrap}.expiry{color:#657386;font-size:.83rem;white-space:nowrap}.action{text-align:right}.msg{margin-bottom:18px;padding:12px 14px;border:1px solid rgba(22,135,152,.18);border-radius:8px;color:#176f7c;background:rgba(255,255,255,.48);font-weight:700}
 .login{position:relative;z-index:1;min-height:calc(100vh - 70px);display:grid;place-items:center;padding:20px}.login-card{width:min(100%,420px);padding:30px}.login-mark{width:48px;height:48px;margin:0 auto 16px;display:grid;place-items:center;border-radius:8px;color:#fff;background:linear-gradient(145deg,#10233e,#285c68);font-weight:850}.login-card h2{margin:0;text-align:center}.login-card p{margin:7px 0 22px;color:#6a798a;text-align:center;font-size:.86rem}
 .theme-glass{position:relative;overflow-x:hidden;background:linear-gradient(118deg,transparent 0 12%,rgba(92,184,190,.18) 12% 21%,transparent 21% 58%,rgba(139,114,210,.12) 58% 69%,transparent 69%),linear-gradient(150deg,#dbeef1,#f4f7f8 46%,#e3eef0 74%,#eef0f7)}.theme-glass:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 0 28%,rgba(255,255,255,.54) 28% 36%,transparent 36% 72%,rgba(114,202,198,.12) 72% 80%,transparent 80%)}
 @media(max-width:1040px){.console{grid-template-columns:310px minmax(0,1fr)}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(3){border-left:0}.metric:nth-child(n+3){border-top:1px solid rgba(115,132,151,.14)}}
@@ -308,13 +309,13 @@ body.theme-glass{color:var(--ink);background:linear-gradient(122deg,transparent 
 .wrap{max-width:1460px;padding:28px 24px 48px}.page-head{margin-bottom:20px}.page-head h1{color:var(--ink);font-size:1.65rem}.runtime-line{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}.runtime-chip{min-height:26px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:#485654;background:rgba(255,255,255,.46);font-size:.74rem;font-weight:750}
 .console{grid-template-columns:minmax(0,1fr);gap:16px}.compose{position:static}.control{display:grid;gap:16px}.card,.metrics,.login-card{border-color:rgba(255,255,255,.72);background:rgba(255,255,255,.64);box-shadow:inset 0 1px 0 rgba(255,255,255,.88),0 12px 34px rgba(35,52,49,.09);backdrop-filter:blur(24px) saturate(1.25)}
 .head{min-height:58px;padding:14px 18px;border-bottom-color:var(--line)}.head-group{display:flex;align-items:baseline;gap:10px;min-width:0}.route-path{color:var(--muted);font-size:.75rem;font-weight:650}.body{padding:16px 18px 18px}
-.grid{grid-template-columns:1.15fr .72fr 1.45fr .72fr 1fr .76fr 1.15fr 1.02fr;align-items:end;gap:12px}.grid>div,.wide{min-width:0;grid-column:auto}.grid label{color:#53615f;font-size:.78rem}input,select{border-color:rgba(58,75,72,.2);color:var(--ink);background:rgba(255,255,255,.66)}input:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(8,127,117,.12)}.primary{min-height:44px;border-color:var(--teal);background:var(--teal);box-shadow:none}.primary:hover{background:var(--teal-dark)}
+.grid{grid-template-columns:.9fr .65fr 1.35fr 1.35fr .65fr .9fr .7fr 1.1fr .95fr;align-items:end;gap:12px}.grid>div,.wide{min-width:0;grid-column:auto}.grid label{color:#53615f;font-size:.78rem}input,select{border-color:rgba(58,75,72,.2);color:var(--ink);background:rgba(255,255,255,.66)}input:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(8,127,117,.12)}.primary{min-height:44px;border-color:var(--teal);background:var(--teal);box-shadow:none}.primary:hover{background:var(--teal-dark)}
 .metrics{grid-template-columns:1fr 1.25fr 1fr 1fr}.metric{padding:15px 18px;border-left-color:var(--line)}.metric .muted{color:var(--muted);font-size:.72rem}.num{margin-top:5px;color:var(--ink);font-size:1.35rem}.proto-key{color:var(--teal)}.proto-key.udp{color:var(--violet)}
 th{padding:11px 14px;color:var(--muted);background:rgba(226,234,232,.42)}td{padding:13px 14px;border-bottom-color:rgba(58,75,72,.1)}.pill{background:#24312f}.tcp{background:var(--teal)}.udp{background:var(--violet)}.danger{color:var(--red);border-color:rgba(198,63,78,.3)}.danger:hover{background:var(--red)}
 .quota-track{width:min(150px,100%);height:4px;margin-top:7px;overflow:hidden;border-radius:4px;background:rgba(58,75,72,.12)}.quota-fill{height:100%;border-radius:inherit;background:var(--teal)}
-@media(max-width:1260px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.field-target,.field-remark,.field-submit{grid-column:span 2}}
-@media(max-width:820px){.wrap{padding-left:14px;padding-right:14px}.page-head h1{font-size:1.48rem}.console{display:grid}.control{display:grid;grid-row:auto}.compose,.metrics,.rules{grid-row:auto}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-target,.field-remark,.field-submit{grid-column:span 2}}
-@media(max-width:500px){.page-head h1{font-size:1.38rem}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(3){border-left:0}.grid{grid-template-columns:1fr}.field-target,.field-remark,.field-submit{grid-column:auto}.route-path{display:none}}
+@media(max-width:1260px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.field-relay,.field-target,.field-remark,.field-submit{grid-column:span 2}}
+@media(max-width:820px){.wrap{padding-left:14px;padding-right:14px}.page-head h1{font-size:1.48rem}.console{display:grid}.control{display:grid;grid-row:auto}.compose,.metrics,.rules{grid-row:auto}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-relay,.field-target,.field-remark,.field-submit{grid-column:span 2}}
+@media(max-width:500px){.page-head h1{font-size:1.38rem}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(3){border-left:0}.grid{grid-template-columns:1fr}.field-relay,.field-target,.field-remark,.field-submit{grid-column:auto}.route-path{display:none}}
 </style>
 """
 
@@ -331,15 +332,15 @@ PAGE = """
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forward Panel</title>""" + CSS + """</head>
 <body class="theme-{{ theme }}"><div class="top"><div class="brand"><span class="brand-mark">IP</span><span class="brand-name">流量中转管理面板</span><span class="backend">{{ backend }}</span></div><div class="top-actions"><span class="state"><span class="state-dot"></span>服务在线</span><a class="btn ghost" href="/logout">退出</a></div></div>
 <main class="wrap"><header class="page-head"><h1>端口转发控制台</h1><div class="runtime-line"><span class="runtime-chip">Python + {{ backend }}</span><span class="runtime-chip">内核转发</span></div></header>{% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
-<div class="console"><aside class="card compose"><div class="head"><div class="head-group"><span>新建转发规则</span><span class="route-path">监听入口 → 目标出口</span></div><span class="caption">DNAT</span></div><div class="body"><form method="post" action="/add" class="grid">
+<div class="console"><aside class="card compose"><div class="head"><div class="head-group"><span>新建转发规则</span><span class="route-path">域名:端口 → 目标出口</span></div><span class="caption">DNAT</span></div><div class="body"><form method="post" action="/add" class="grid">
 <div class="field-protocol"><label>协议</label><select name="protocol"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="all">TCP + UDP</option></select></div>
-<div class="field-listener"><label>监听端口</label><input name="local_port" type="number" min="1" max="65535" required></div><div class="field-target"><label>目标 IP / 域名</label><input name="target_ip" required></div><div class="field-target-port"><label>目标端口</label><input name="target_port" type="number" min="1" max="65535" required></div>
+<div class="field-listener"><label>监听端口</label><input name="local_port" type="number" min="1" max="65535" required></div><div class="field-relay"><label>中转入口域名</label><input name="relay_host" placeholder="选填，如 relay.example.com" inputmode="url"></div><div class="field-target"><label>目标 IP / 域名</label><input name="target_ip" required></div><div class="field-target-port"><label>目标端口</label><input name="target_port" type="number" min="1" max="65535" required></div>
 <div class="field-remark"><label>备注</label><input name="remark"></div><div class="field-quota"><label>流量上限 MB</label><input name="quota_mb" type="number" min="1"></div>
 <div class="field-expiry"><label>到期时间 UTC+8</label><input name="expires_at" type="datetime-local"></div><div class="field-submit"><button class="primary">添加规则</button></div></form></div></aside>
 <div class="control"><section class="metrics"><div class="metric"><div class="muted">总规则</div><div class="num">{{ rules|length }}</div></div><div class="metric"><div class="muted">总流量</div><div class="num">{{ total_traffic_text }}</div></div>
 <div class="metric"><div class="muted">TCP 规则</div><div class="num"><span class="proto-key">TCP</span>{{ tcp_count }}</div></div><div class="metric"><div class="muted">UDP 规则</div><div class="num"><span class="proto-key udp">UDP</span>{{ udp_count }}</div></div></section>
-<section class="card rules"><div class="head"><span>当前生效规则</span><span class="rule-count">{{ rules|length }}</span></div><div class="table-wrap"><table><thead><tr><th>协议</th><th>监听端口</th><th>目标地址</th><th>备注</th><th>总流量<br><small>上行 + 下行</small></th><th>到期时间</th><th class="action">操作</th></tr></thead><tbody>
-{% for r in rules %}<tr><td data-label="协议"><span class="pill {% if r.protocol == 'TCP' %}tcp{% else %}udp{% endif %}">{{ r.protocol }}</span></td><td data-label="监听端口"><span class="port">{{ r.local_port }}</span></td>
+<section class="card rules"><div class="head"><span>当前生效规则</span><span class="rule-count">{{ rules|length }}</span></div><div class="table-wrap"><table><thead><tr><th>协议</th><th>中转入口</th><th>目标地址</th><th>备注</th><th>总流量<br><small>上行 + 下行</small></th><th>到期时间</th><th class="action">操作</th></tr></thead><tbody>
+{% for r in rules %}<tr><td data-label="协议"><span class="pill {% if r.protocol == 'TCP' %}tcp{% else %}udp{% endif %}">{{ r.protocol }}</span></td><td data-label="中转入口"><span class="port">{% if r.relay_host %}{{ r.relay_host }}{% else %}*{% endif %}:{{ r.local_port }}</span></td>
 <td class="full" data-label="目标地址"><span class="pill">{{ r.target_ip }}:{{ r.target_port }}</span></td><td class="muted full" data-label="备注">{{ r.remark or '-' }}</td><td class="traffic" data-label="总流量">{{ r.traffic_text }}{% if r.quota_bytes %}<div class="quota-track"><div class="quota-fill" style="width:{{ r.traffic_percent }}%"></div></div>{% endif %}</td><td class="expiry" data-label="到期时间">{{ r.expires_text }}</td><td class="action" data-label="操作">
 <form method="post" action="/delete" style="display:inline"><input type="hidden" name="protocol" value="{{ r.protocol|lower }}"><input type="hidden" name="local_port" value="{{ r.local_port }}">
 <input type="hidden" name="target_ip" value="{{ r.target_ip }}"><input type="hidden" name="target_port" value="{{ r.target_port }}"><input type="hidden" name="remark" value="{{ r.remark }}">
@@ -357,6 +358,26 @@ def valid_port(value):
 
 def normalize_target(value):
     return socket.gethostbyname(value.strip())
+
+def normalize_relay_host(value):
+    value = (value or "").strip().rstrip(".")
+    if not value:
+        return ""
+    host = value.lower()
+    if not host.isascii():
+        raise ValueError("invalid relay host")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("relay host must be a domain")
+    labels = host.split(".")
+    if len(host) > 253 or len(labels) < 2 or any(not re.fullmatch(r"(?!-)[a-z0-9-]{1,63}(?<!-)", label) for label in labels):
+        raise ValueError("invalid relay host")
+    if not socket.gethostbyname_ex(host)[2]:
+        raise ValueError("relay host does not resolve")
+    return host
 
 def comment_for(remark):
     remark = (remark or "").replace('"', "").replace("'", "").strip()
@@ -443,6 +464,7 @@ def load_limits():
                         "expires_at": parts[2],
                         "base_bytes": int(parts[3] or 0) if len(parts) >= 4 else 0,
                         "target_host": parts[4] if len(parts) >= 5 else "",
+                        "relay_host": parts[5] if len(parts) >= 6 else "",
                     }
     except Exception:
         pass
@@ -454,7 +476,8 @@ def save_limits(limits):
         for track_id, limit in limits.items():
             limit_file.write(
                 f"{track_id}\t{int(limit.get('quota_bytes', 0) or 0)}\t{limit.get('expires_at', '')}"
-                f"\t{int(limit.get('base_bytes', 0) or 0)}\t{limit.get('target_host', '')}\n"
+                f"\t{int(limit.get('base_bytes', 0) or 0)}\t{limit.get('target_host', '')}"
+                f"\t{limit.get('relay_host', '')}\n"
             )
     os.replace(tmp_path, LIMIT_FILE)
 
@@ -545,6 +568,7 @@ def list_iptables_rules():
                 "local_port": local_port,
                 "target_ip": target_ip,
                 "target_port": target_port,
+                "relay_host": limit.get("relay_host", ""),
                 "remark": remark,
                 "rule_comment": rule_comment,
                 "pre_handle": "",
@@ -597,6 +621,7 @@ def list_nftables_rules():
                 "local_port": local_port,
                 "target_ip": target_ip,
                 "target_port": target_port,
+                "relay_host": limit.get("relay_host", ""),
                 "remark": remark,
                 "rule_comment": rule_comment,
                 "pre_handle": handle_m.group(1),
@@ -734,6 +759,7 @@ def refresh_domain_rules_once():
             "expires_at": limit.get("expires_at", ""),
             "base_bytes": rule["traffic_bytes"],
             "target_host": target_host,
+            "relay_host": limit.get("relay_host", ""),
         }
         changed = True
     if changed:
@@ -796,10 +822,16 @@ def add():
     expires_at = parse_expires_at(request.form.get("expires_at"))
     if not valid_port(local_port) or not valid_port(target_port):
         return redirect(url_for("index", msg="端口必须是 1-65535"))
+    if int(local_port) == args.port:
+        return redirect(url_for("index", msg="监听端口已被面板服务占用"))
     if quota_bytes is None:
         return redirect(url_for("index", msg="流量上限必须是数字，单位 MB"))
     if expires_at is None:
         return redirect(url_for("index", msg="到期时间格式无效，请使用 UTC+8 时间"))
+    try:
+        relay_host = normalize_relay_host(request.form.get("relay_host"))
+    except Exception:
+        return redirect(url_for("index", msg="中转入口域名无效或无法解析"))
     target_input = request.form.get("target_ip", "").strip()
     try:
         target_ip = normalize_target(target_input)
@@ -807,9 +839,8 @@ def add():
         return redirect(url_for("index", msg="目标 IP 或域名无效"))
     protos = ["tcp", "udp"] if request.form.get("protocol") == "all" else [request.form.get("protocol", "tcp")]
     current = list_rules()
-    for proto in protos:
-        if any(r["protocol"].lower() == proto and r["local_port"] == local_port for r in current):
-            return redirect(url_for("index", msg="规则已存在"))
+    if any(r["local_port"] == local_port for r in current):
+        return redirect(url_for("index", msg="监听端口已被占用；如需 TCP + UDP，请一次选择双栈"))
     created_protos = []
     try:
         limits = load_limits()
@@ -819,12 +850,13 @@ def add():
                 remark = f"{remark} [{target_input}]".strip()
             add_rule(proto, local_port, target_ip, target_port, remark)
             created_protos.append(proto)
-            if quota_bytes or expires_at or target_ip != target_input:
+            if quota_bytes or expires_at or target_ip != target_input or relay_host:
                 limits[track_id_for(proto, local_port, target_ip, target_port, remark)] = {
                     "quota_bytes": quota_bytes,
                     "expires_at": expires_at,
                     "base_bytes": 0,
                     "target_host": target_input if target_ip != target_input else "",
+                    "relay_host": relay_host,
                 }
         save_limits(limits)
         return redirect(url_for("index", msg="添加成功"))
@@ -866,7 +898,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 use std::process::Command;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -889,6 +921,7 @@ struct Rule {
     local_port: String,
     target_ip: String,
     target_port: String,
+    relay_host: String,
     remark: String,
     rule_comment: String,
     pre_handle: String,
@@ -1084,6 +1117,7 @@ struct Limit {
     expires_at: String,
     base_bytes: u64,
     target_host: String,
+    relay_host: String,
 }
 
 fn load_limits() -> HashMap<String, Limit> {
@@ -1097,6 +1131,7 @@ fn load_limits() -> HashMap<String, Limit> {
                     expires_at: parts[2].to_string(),
                     base_bytes: parts.get(3).and_then(|value| value.parse().ok()).unwrap_or(0),
                     target_host: parts.get(4).unwrap_or(&"").to_string(),
+                    relay_host: parts.get(5).unwrap_or(&"").to_string(),
                 });
             }
         }
@@ -1107,7 +1142,7 @@ fn load_limits() -> HashMap<String, Limit> {
 fn save_limits(limits: &HashMap<String, Limit>) {
     let mut content = String::new();
     for (track_id, limit) in limits {
-        content.push_str(&format!("{}\t{}\t{}\t{}\t{}\n", track_id, limit.quota_bytes, limit.expires_at, limit.base_bytes, limit.target_host));
+        content.push_str(&format!("{}\t{}\t{}\t{}\t{}\t{}\n", track_id, limit.quota_bytes, limit.expires_at, limit.base_bytes, limit.target_host, limit.relay_host));
     }
     let _ = fs::write("/opt/iptables-panel/limits.tsv.tmp", content);
     let _ = fs::rename("/opt/iptables-panel/limits.tsv.tmp", "/opt/iptables-panel/limits.tsv");
@@ -1134,6 +1169,31 @@ fn parse_expires_at(value: Option<&String>) -> Option<String> {
         && bytes[13] == b':'
         && raw.chars().enumerate().all(|(i, ch)| matches!(i, 4 | 7 | 10 | 13) || ch.is_ascii_digit());
     if valid { Some(raw.to_string()) } else { None }
+}
+
+fn normalize_relay_host(value: Option<&String>) -> Option<String> {
+    let host = value.map(String::as_str).unwrap_or("").trim().trim_end_matches('.').to_lowercase();
+    if host.is_empty() {
+        return Some(String::new());
+    }
+    if host.len() > 253 || !host.is_ascii() || host.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+    let labels: Vec<&str> = host.split('.').collect();
+    if labels.len() < 2 || labels.iter().any(|label| {
+        label.is_empty()
+            || label.len() > 63
+            || label.starts_with('-')
+            || label.ends_with('-')
+            || !label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    }) {
+        return None;
+    }
+    let resolves_ipv4 = format!("{}:0", host)
+        .to_socket_addrs()
+        .map(|mut addresses| addresses.any(|address| address.is_ipv4()))
+        .unwrap_or(false);
+    if resolves_ipv4 { Some(host) } else { None }
 }
 
 fn utc8_now_string() -> String {
@@ -1273,6 +1333,7 @@ fn list_iptables_rules() -> Vec<Rule> {
             local_port,
             target_ip,
             target_port,
+            relay_host: limit.relay_host.clone(),
             remark,
             rule_comment: comment,
             track_id,
@@ -1345,6 +1406,7 @@ fn list_nftables_rules() -> Vec<Rule> {
             local_port: local_port.to_string(),
             target_ip,
             target_port,
+            relay_host: limit.relay_host.clone(),
             remark,
             rule_comment: comment,
             pre_handle: handle_from(line),
@@ -1525,6 +1587,7 @@ fn refresh_domain_rules_once(config: &Config) {
             expires_at: limit.expires_at,
             base_bytes: rule.traffic_bytes,
             target_host: limit.target_host,
+            relay_host: limit.relay_host,
         });
         changed = true;
     }
@@ -1555,6 +1618,7 @@ fn page(config: &Config, msg: &str) -> String {
     let mut rows = String::new();
     for r in &rules {
         let badge = if r.protocol == "TCP" { "tcp" } else { "udp" };
+        let relay_entry = format!("{}:{}", if r.relay_host.is_empty() { "*" } else { r.relay_host.as_str() }, r.local_port);
         let quota_progress = if r.quota_bytes > 0 {
             let percent = std::cmp::min(100, r.traffic_bytes.saturating_mul(100) / r.quota_bytes);
             format!("<div class=\"quota-track\"><div class=\"quota-fill\" style=\"width:{}%\"></div></div>", percent)
@@ -1562,8 +1626,8 @@ fn page(config: &Config, msg: &str) -> String {
             String::new()
         };
         rows.push_str(&format!(
-            "<tr><td data-label=\"协议\"><span class=\"pill {}\">{}</span></td><td data-label=\"监听端口\"><span class=\"port\">{}</span></td><td class=\"full\" data-label=\"目标地址\"><span class=\"pill\">{}:{}</span></td><td class=\"muted full\" data-label=\"备注\">{}</td><td class=\"traffic\" data-label=\"总流量\">{}{}</td><td class=\"expiry\" data-label=\"到期时间\">{}</td><td class=\"action\" data-label=\"操作\"><form method=\"post\" action=\"/delete\"><input type=\"hidden\" name=\"protocol\" value=\"{}\"><input type=\"hidden\" name=\"local_port\" value=\"{}\"><input type=\"hidden\" name=\"target_ip\" value=\"{}\"><input type=\"hidden\" name=\"target_port\" value=\"{}\"><input type=\"hidden\" name=\"remark\" value=\"{}\"><input type=\"hidden\" name=\"rule_comment\" value=\"{}\"><input type=\"hidden\" name=\"pre_handle\" value=\"{}\"><input type=\"hidden\" name=\"post_handle\" value=\"{}\"><button class=\"danger\" onclick=\"return confirm('确定删除这条规则?')\">删除</button></form></td></tr>",
-            badge, html_escape(&r.protocol), html_escape(&r.local_port), html_escape(&r.target_ip), html_escape(&r.target_port),
+            "<tr><td data-label=\"协议\"><span class=\"pill {}\">{}</span></td><td data-label=\"中转入口\"><span class=\"port\">{}</span></td><td class=\"full\" data-label=\"目标地址\"><span class=\"pill\">{}:{}</span></td><td class=\"muted full\" data-label=\"备注\">{}</td><td class=\"traffic\" data-label=\"总流量\">{}{}</td><td class=\"expiry\" data-label=\"到期时间\">{}</td><td class=\"action\" data-label=\"操作\"><form method=\"post\" action=\"/delete\"><input type=\"hidden\" name=\"protocol\" value=\"{}\"><input type=\"hidden\" name=\"local_port\" value=\"{}\"><input type=\"hidden\" name=\"target_ip\" value=\"{}\"><input type=\"hidden\" name=\"target_port\" value=\"{}\"><input type=\"hidden\" name=\"remark\" value=\"{}\"><input type=\"hidden\" name=\"rule_comment\" value=\"{}\"><input type=\"hidden\" name=\"pre_handle\" value=\"{}\"><input type=\"hidden\" name=\"post_handle\" value=\"{}\"><button class=\"danger\" onclick=\"return confirm('确定删除这条规则?')\">删除</button></form></td></tr>",
+            badge, html_escape(&r.protocol), html_escape(&relay_entry), html_escape(&r.target_ip), html_escape(&r.target_port),
             html_escape(&r.remark), html_escape(&r.traffic_text), quota_progress, html_escape(&r.expires_text), r.protocol.to_lowercase(), html_escape(&r.local_port), html_escape(&r.target_ip),
             html_escape(&r.target_port), html_escape(&r.remark), html_escape(&r.rule_comment), html_escape(&r.pre_handle), html_escape(&r.post_handle)
         ));
@@ -1572,7 +1636,7 @@ fn page(config: &Config, msg: &str) -> String {
         rows.push_str("<tr><td colspan=\"7\" class=\"empty\" style=\"text-align:center;color:#6b7685;padding:34px\">当前没有规则</td></tr>");
     }
     format!(
-        r#"<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forward Panel</title>{}</head><body class="theme-{}"><div class="top"><div class="brand"><span class="brand-mark">IP</span><span class="brand-name">流量中转管理面板</span><span class="backend">{}</span></div><div class="top-actions"><span class="state"><span class="state-dot"></span>服务在线</span><a class="btn ghost" href="/logout">退出</a></div></div><main class="wrap"><header class="page-head"><h1>端口转发控制台</h1><div class="runtime-line"><span class="runtime-chip">Rust + {}</span><span class="runtime-chip">内核转发</span></div></header>{}<div class="console"><aside class="card compose"><div class="head"><div class="head-group"><span>新建转发规则</span><span class="route-path">监听入口 → 目标出口</span></div><span class="caption">DNAT</span></div><div class="body"><form method="post" action="/add" class="grid"><div class="field-protocol"><label>协议</label><select name="protocol"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="all">TCP + UDP</option></select></div><div class="field-listener"><label>监听端口</label><input name="local_port" type="number" min="1" max="65535" required></div><div class="field-target"><label>目标 IP / 域名</label><input name="target_ip" required></div><div class="field-target-port"><label>目标端口</label><input name="target_port" type="number" min="1" max="65535" required></div><div class="field-remark"><label>备注</label><input name="remark"></div><div class="field-quota"><label>流量上限 MB</label><input name="quota_mb" type="number" min="1"></div><div class="field-expiry"><label>到期时间 UTC+8</label><input name="expires_at" type="datetime-local"></div><div class="field-submit"><button class="primary">添加规则</button></div></form></div></aside><div class="control"><section class="metrics"><div class="metric"><div class="muted">总规则</div><div class="num">{}</div></div><div class="metric"><div class="muted">总流量</div><div class="num">{}</div></div><div class="metric"><div class="muted">TCP 规则</div><div class="num"><span class="proto-key">TCP</span>{}</div></div><div class="metric"><div class="muted">UDP 规则</div><div class="num"><span class="proto-key udp">UDP</span>{}</div></div></section><section class="card rules"><div class="head"><span>当前生效规则</span><span class="rule-count">{}</span></div><div class="table-wrap"><table><thead><tr><th>协议</th><th>监听端口</th><th>目标地址</th><th>备注</th><th>总流量<br><small>上行 + 下行</small></th><th>到期时间</th><th class="action">操作</th></tr></thead><tbody>{}</tbody></table></div></section></div></div></main></body></html>"#,
+        r#"<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Forward Panel</title>{}</head><body class="theme-{}"><div class="top"><div class="brand"><span class="brand-mark">IP</span><span class="brand-name">流量中转管理面板</span><span class="backend">{}</span></div><div class="top-actions"><span class="state"><span class="state-dot"></span>服务在线</span><a class="btn ghost" href="/logout">退出</a></div></div><main class="wrap"><header class="page-head"><h1>端口转发控制台</h1><div class="runtime-line"><span class="runtime-chip">Rust + {}</span><span class="runtime-chip">内核转发</span></div></header>{}<div class="console"><aside class="card compose"><div class="head"><div class="head-group"><span>新建转发规则</span><span class="route-path">域名:端口 → 目标出口</span></div><span class="caption">DNAT</span></div><div class="body"><form method="post" action="/add" class="grid"><div class="field-protocol"><label>协议</label><select name="protocol"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="all">TCP + UDP</option></select></div><div class="field-listener"><label>监听端口</label><input name="local_port" type="number" min="1" max="65535" required></div><div class="field-relay"><label>中转入口域名</label><input name="relay_host" placeholder="选填，如 relay.example.com" inputmode="url"></div><div class="field-target"><label>目标 IP / 域名</label><input name="target_ip" required></div><div class="field-target-port"><label>目标端口</label><input name="target_port" type="number" min="1" max="65535" required></div><div class="field-remark"><label>备注</label><input name="remark"></div><div class="field-quota"><label>流量上限 MB</label><input name="quota_mb" type="number" min="1"></div><div class="field-expiry"><label>到期时间 UTC+8</label><input name="expires_at" type="datetime-local"></div><div class="field-submit"><button class="primary">添加规则</button></div></form></div></aside><div class="control"><section class="metrics"><div class="metric"><div class="muted">总规则</div><div class="num">{}</div></div><div class="metric"><div class="muted">总流量</div><div class="num">{}</div></div><div class="metric"><div class="muted">TCP 规则</div><div class="num"><span class="proto-key">TCP</span>{}</div></div><div class="metric"><div class="muted">UDP 规则</div><div class="num"><span class="proto-key udp">UDP</span>{}</div></div></section><section class="card rules"><div class="head"><span>当前生效规则</span><span class="rule-count">{}</span></div><div class="table-wrap"><table><thead><tr><th>协议</th><th>中转入口</th><th>目标地址</th><th>备注</th><th>总流量<br><small>上行 + 下行</small></th><th>到期时间</th><th class="action">操作</th></tr></thead><tbody>{}</tbody></table></div></section></div></div></main></body></html>"#,
         style(),
         html_escape(&config.theme),
         html_escape(&config.backend),
@@ -1592,7 +1656,8 @@ fn style() -> &'static str {
     r#"<style>@media(max-width:820px){.backend{display:none}.control{display:contents}.metrics{grid-row:1}.compose{grid-row:2}.rules{grid-row:3}}</style>"#,
     r#"<style>:root{--ink:#18201f;--muted:#65716f;--line:rgba(58,75,72,.16);--teal:#087f75;--teal-dark:#08645e;--violet:#6d4bc3;--red:#c63f4e}body.theme-glass{color:var(--ink);background:linear-gradient(122deg,transparent 0 18%,rgba(66,170,161,.11) 18% 31%,transparent 31% 67%,rgba(109,75,195,.08) 67% 77%,transparent 77%),#edf2f1}.theme-glass:before{background:linear-gradient(110deg,transparent 0 29%,rgba(255,255,255,.64) 29% 40%,transparent 40% 73%,rgba(107,205,197,.12) 73% 83%,transparent 83%);opacity:.78}.top{min-height:62px;color:#f7fbfa;border-bottom-color:rgba(255,255,255,.1);background:rgba(24,32,31,.92);box-shadow:0 8px 26px rgba(25,36,34,.12);backdrop-filter:blur(20px) saturate(1.25)}.brand-mark{width:36px;height:36px;background:var(--teal)}.backend{color:#b9cbc8}.state{color:#bde6df}.ghost{color:#f7fbfa;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.06)}.wrap{max-width:1460px;padding:28px 24px 48px}.page-head{margin-bottom:20px}.page-head h1{color:var(--ink);font-size:1.65rem}.runtime-line{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}.runtime-chip{min-height:26px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;color:#485654;background:rgba(255,255,255,.46);font-size:.74rem;font-weight:750}.console{grid-template-columns:minmax(0,1fr);gap:16px}.compose{position:static}.control{display:grid;gap:16px}.card,.metrics,.login-card{border-color:rgba(255,255,255,.72);background:rgba(255,255,255,.64);box-shadow:inset 0 1px 0 rgba(255,255,255,.88),0 12px 34px rgba(35,52,49,.09);backdrop-filter:blur(24px) saturate(1.25)}.theme-glass .top:before,.theme-glass .card:before,.theme-glass .metric:before{display:none}.head{min-height:58px;padding:14px 18px;border-bottom-color:var(--line)}.head-group{display:flex;align-items:baseline;gap:10px;min-width:0}.route-path{color:var(--muted);font-size:.75rem;font-weight:650}.body{padding:16px 18px 18px}.grid{grid-template-columns:1.15fr .72fr 1.45fr .72fr 1fr .76fr 1.15fr 1.02fr;align-items:end;gap:12px}.grid>div,.wide{min-width:0;grid-column:auto}.grid label{color:#53615f;font-size:.78rem}input,select{border-color:rgba(58,75,72,.2);color:var(--ink);background:rgba(255,255,255,.66)}input:focus,select:focus{outline:0;border-color:var(--teal);box-shadow:0 0 0 3px rgba(8,127,117,.12)}.primary{min-height:44px;border-color:var(--teal);background:var(--teal);box-shadow:none}.metrics{grid-template-columns:1fr 1.25fr 1fr 1fr}.metric{padding:15px 18px;border-left-color:var(--line)}.metric .muted{color:var(--muted);font-size:.72rem}.num{margin-top:5px;color:var(--ink);font-size:1.35rem}.proto-key{color:var(--teal)}.proto-key.udp{color:var(--violet)}th{padding:11px 14px;color:var(--muted);background:rgba(226,234,232,.42)}td{padding:13px 14px;border-bottom-color:rgba(58,75,72,.1)}.pill{background:#24312f}.tcp{background:var(--teal)}.udp{background:var(--violet)}.danger{color:var(--red);border-color:rgba(198,63,78,.3)}.danger:hover{background:var(--red)}.quota-track{width:min(150px,100%);height:4px;margin-top:7px;overflow:hidden;border-radius:4px;background:rgba(58,75,72,.12)}.quota-fill{height:100%;border-radius:inherit;background:var(--teal)}@media(max-width:1260px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.field-target,.field-remark,.field-submit{grid-column:span 2}}@media(max-width:820px){.wrap{padding-left:14px;padding-right:14px}.page-head h1{font-size:1.48rem}.console{display:grid}.control{display:grid;grid-row:auto}.compose,.metrics,.rules{grid-row:auto}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-target,.field-remark,.field-submit{grid-column:span 2}}@media(max-width:500px){.page-head h1{font-size:1.38rem}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric:nth-child(3){border-left:0}.grid{grid-template-columns:1fr}.field-target,.field-remark,.field-submit{grid-column:auto}.route-path{display:none}}</style>"#
     ,
-    r#"<style>.theme-glass .top{position:sticky;top:0}</style>"#
+    r#"<style>.theme-glass .top{position:sticky;top:0}</style>"#,
+    r#"<style>.grid{grid-template-columns:.9fr .65fr 1.35fr 1.35fr .65fr .9fr .7fr 1.1fr .95fr}.port{overflow-wrap:anywhere}@media(max-width:1260px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.field-relay,.field-target,.field-remark,.field-submit{grid-column:span 2}}@media(max-width:820px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.field-relay,.field-target,.field-remark,.field-submit{grid-column:span 2}}@media(max-width:500px){.grid{grid-template-columns:1fr}.field-relay,.field-target,.field-remark,.field-submit{grid-column:auto}}</style>"#
     )
 }
 
@@ -1714,8 +1779,19 @@ fn handle(mut stream: TcpStream, config: Config) {
                 return;
             }
         };
+        let relay_host = match normalize_relay_host(form.get("relay_host")) {
+            Some(value) => value,
+            None => {
+                redirect(&mut stream, "/?msg=bad_relay", &[]);
+                return;
+            }
+        };
         if !valid_port(&local_port) || !valid_port(&target_port) {
             redirect(&mut stream, "/?msg=bad_port", &[]);
+            return;
+        }
+        if local_port.parse::<u16>().ok() == Some(config.port) {
+            redirect(&mut stream, "/?msg=panel_port", &[]);
             return;
         }
         let target_input = form.get("target_ip").cloned().unwrap_or_default();
@@ -1725,11 +1801,9 @@ fn handle(mut stream: TcpStream, config: Config) {
         let selected = form.get("protocol").map(String::as_str).unwrap_or("tcp");
         let protos = if selected == "all" { vec!["tcp", "udp"] } else { vec![selected] };
         let current = list_rules(&config.backend);
-        for proto in &protos {
-            if current.iter().any(|r| r.protocol.to_lowercase() == *proto && r.local_port == local_port) {
-                redirect(&mut stream, "/?msg=duplicate", &[]);
-                return;
-            }
+        if current.iter().any(|r| r.local_port == local_port) {
+            redirect(&mut stream, "/?msg=duplicate", &[]);
+            return;
         }
         let mut limits = load_limits();
         let mut created_rules: Vec<(String, String)> = Vec::new();
@@ -1758,12 +1832,13 @@ fn handle(mut stream: TcpStream, config: Config) {
                 return;
             }
             created_rules.push((proto.to_string(), remark.clone()));
-            if quota_bytes > 0 || !expires_at.is_empty() || uses_domain {
+            if quota_bytes > 0 || !expires_at.is_empty() || uses_domain || !relay_host.is_empty() {
                 limits.insert(track_id_for(proto, &local_port, &target_ip, &target_port, &remark), Limit {
                     quota_bytes,
                     expires_at: expires_at.clone(),
                     base_bytes: 0,
                     target_host: if uses_domain { target_input.clone() } else { String::new() },
+                    relay_host: relay_host.clone(),
                 });
             }
         }
@@ -1786,7 +1861,7 @@ fn handle(mut stream: TcpStream, config: Config) {
         return;
     }
 
-    let msg = if path.contains("msg=bad_port") { "端口必须是 1-65535" } else if path.contains("msg=bad_quota") { "流量上限必须是数字，单位 MB" } else if path.contains("msg=bad_expires") { "到期时间格式无效，请使用 UTC+8 时间" } else if path.contains("msg=duplicate") { "规则已存在" } else if path.contains("msg=failed") { "操作失败" } else if path.contains("msg=added") { "添加成功" } else if path.contains("msg=deleted") { "删除完成" } else { "" };
+    let msg = if path.contains("msg=bad_port") { "端口必须是 1-65535" } else if path.contains("msg=bad_quota") { "流量上限必须是数字，单位 MB" } else if path.contains("msg=bad_expires") { "到期时间格式无效，请使用 UTC+8 时间" } else if path.contains("msg=bad_relay") { "中转入口域名无效或无法解析" } else if path.contains("msg=panel_port") { "监听端口已被面板服务占用" } else if path.contains("msg=duplicate") { "监听端口已被占用；如需 TCP + UDP，请一次选择双栈" } else if path.contains("msg=failed") { "操作失败" } else if path.contains("msg=added") { "添加成功" } else if path.contains("msg=deleted") { "删除完成" } else { "" };
     respond(&mut stream, "200 OK", &page(&config, msg), &[]);
 }
 

@@ -55,13 +55,34 @@ load_existing_settings() {
 }
 
 cleanup_visible_rules() {
-  echo "⚠️ 即将删除当前面板可识别的 PREROUTING DNAT 和对应 MASQUERADE 规则。"
-  echo "⚠️ 如果系统里存在非本面板创建、但格式相同的转发规则，也可能被删除。"
+  echo "⚠️ 即将删除当前防火墙后端中的面板转发规则。"
   read -p "请输入 DELETE 确认删除这些规则: " CONFIRM_DELETE
   if [ "$CONFIRM_DELETE" != "DELETE" ]; then
     echo "已取消规则删除。"
     return
   fi
+
+  local current_backend current_exec
+  current_backend=$(config_value PANEL_BACKEND)
+  if [ -z "$current_backend" ] && [ -f "$SERVICE_FILE" ]; then
+    current_exec=$(sed -n 's/^ExecStart=//p' "$SERVICE_FILE" | head -n 1)
+    if printf '%s' "$current_exec" | grep -q -- '--backend nftables'; then
+      current_backend="nftables"
+    fi
+  fi
+
+  if [ "$current_backend" = "nftables" ]; then
+    if command -v nft > /dev/null 2>&1 && nft list table ip iptables_panel > /dev/null 2>&1; then
+      nft delete table ip iptables_panel
+      echo "✅ 已删除 nftables 面板规则表。"
+    else
+      echo "未找到 nftables 面板规则表，无需删除。"
+    fi
+    return
+  fi
+
+  echo "⚠️ 将删除面板可识别的 iptables DNAT、MASQUERADE 和流量追踪规则。"
+  echo "⚠️ 非本面板创建但格式相同的规则也可能被识别，请确认后继续。"
 
   if ! command -v python3 > /dev/null 2>&1; then
     echo "❌ 未找到 python3，无法安全解析并删除规则。面板文件仍将继续卸载。"
@@ -127,11 +148,12 @@ PY
 
 uninstall_panel() {
   local remove_rules="$1"
+  systemctl stop iptables-panel > /dev/null 2>&1 || true
+
   if [ "$remove_rules" = "yes" ]; then
     cleanup_visible_rules
   fi
 
-  systemctl stop iptables-panel > /dev/null 2>&1 || true
   systemctl disable iptables-panel > /dev/null 2>&1 || true
   rm -f "$SERVICE_FILE"
   systemctl daemon-reload > /dev/null 2>&1 || true
@@ -283,14 +305,17 @@ T = {
     'zh': {
         'login_title': '流量中转面板登录', 'username': '用户名', 'password': '密码', 'login_btn': '登录面板',
         'panel_title': '流量中转管理面板', 'logout': '退出', 'add_rule': '新建转发规则',
-        'protocol': '转发协议', 'local_port': '监听端口', 'target_ip': '目标 IP 或 域名', 'target_port': '目标端口',
+        'protocol': '转发协议', 'local_port': '监听端口', 'relay_host': '中转入口域名', 'relay_host_ph': '选填，如 relay.example.com',
+        'relay_entry': '中转入口', 'target_ip': '目标 IP 或 域名', 'target_port': '目标端口',
         'remark': '备注信息', 'remark_ph': '选填 (如: Web/游戏服)', 'add_btn': '立即添加转发规则', 
         'cur_rules': '当前生效规则', 'proto': '协议', 'forward_to': '转发至',
         'action': '操作', 'delete': '删除', 'no_rules': '当前没有配置任何转发规则。',
         'confirm_del': '确定要删除这条规则吗？', 'tcp_only': '纯 TCP (网页/SSH)',
         'udp_only': '纯 UDP (Hysteria2)', 'dual_stack': 'TCP + UDP 双栈',
         'lang_btn': 'English', 'switch_to': 'en', 'status_online': '服务在线', 'err_port': '端口必须是 1-65535 之间的数字！',
-        'err_ip': '无效的 IP 地址或域名解析失败！', 'err_duplicate': '规则已存在，无需重复添加。',
+        'err_ip': '无效的 IP 地址或域名解析失败！', 'err_relay_host': '中转入口域名无效或无法解析！',
+        'err_panel_port': '监听端口已被面板服务占用！',
+        'err_duplicate': '监听端口已被占用；如需 TCP + UDP，请一次选择双栈。',
         'add_success': '添加成功！', 'del_success': '删除成功',
         'login_error': '用户名或密码错误', 'overview': '运行概览', 'total_rules': '总规则', 'total_traffic': '总流量',
         'tcp_rules': 'TCP 规则', 'udp_rules': 'UDP 规则', 'traffic': '流量',
@@ -298,19 +323,22 @@ T = {
         'err_quota': '流量上限必须是数字，单位 MB。', 'unlimited': '不限',
         'traffic_note': '流量为上行 + 下行总和', 'expires_at': '到期时间', 'expires_ph': 'UTC+8',
         'err_expires': '到期时间格式无效，请使用 UTC+8 时间。', 'runtime_mode': '运行模式',
-        'kernel_forwarding': '内核转发', 'route_path': '监听入口 → 目标出口'
+        'kernel_forwarding': '内核转发', 'route_path': '域名:端口 → 目标出口'
     },
     'en': {
         'login_title': 'Traffic Forwarding Login', 'username': 'Username', 'password': 'Password', 'login_btn': 'Sign in',
         'panel_title': 'Traffic Forwarding Panel', 'logout': 'Logout', 'add_rule': 'Create Forwarding Rule',
-        'protocol': 'Protocol', 'local_port': 'Local Port', 'target_ip': 'Target IP / Domain', 'target_port': 'Target Port',
+        'protocol': 'Protocol', 'local_port': 'Local Port', 'relay_host': 'Relay Entry Domain', 'relay_host_ph': 'Optional, e.g. relay.example.com',
+        'relay_entry': 'Relay Entry', 'target_ip': 'Target IP / Domain', 'target_port': 'Target Port',
         'remark': 'Remark / Note', 'remark_ph': 'Optional', 'add_btn': 'Add Forwarding Rule', 
         'cur_rules': 'Active Rules', 'proto': 'Protocol', 'forward_to': 'Forward to',
         'action': 'Action', 'delete': 'Delete', 'no_rules': 'No rules configured currently.',
         'confirm_del': 'Are you sure you want to delete this rule?', 'tcp_only': 'TCP Only (Web)',
         'udp_only': 'UDP Only (Hysteria2)', 'dual_stack': 'TCP + UDP Dual',
         'lang_btn': '中文', 'switch_to': 'zh', 'status_online': 'Service online', 'err_port': 'Ports must be numbers between 1 and 65535!',
-        'err_ip': 'Invalid IP or Domain resolution failed!', 'err_duplicate': 'Rule already exists. No duplicate was added.',
+        'err_ip': 'Invalid IP or Domain resolution failed!', 'err_relay_host': 'The relay entry domain is invalid or cannot be resolved!',
+        'err_panel_port': 'The listening port is already used by the panel service!',
+        'err_duplicate': 'The listening port is already in use. Select TCP + UDP together when dual protocol is required.',
         'add_success': 'Added successfully!', 'del_success': 'Deleted',
         'login_error': 'Invalid username or password', 'overview': 'Overview', 'total_rules': 'Total Rules', 'total_traffic': 'Total Traffic',
         'tcp_rules': 'TCP Rules', 'udp_rules': 'UDP Rules', 'traffic': 'Traffic',
@@ -318,7 +346,7 @@ T = {
         'err_quota': 'Traffic limit must be a number in MB.', 'unlimited': 'Unlimited',
         'traffic_note': 'Traffic is upload + download total', 'expires_at': 'Expires At', 'expires_ph': 'UTC+8',
         'err_expires': 'Invalid expiration time. Use UTC+8 time.', 'runtime_mode': 'Runtime',
-        'kernel_forwarding': 'Kernel forwarding', 'route_path': 'Listener → Destination'
+        'kernel_forwarding': 'Kernel forwarding', 'route_path': 'Domain:port → Destination'
     }
 }
 
@@ -923,7 +951,7 @@ HEADER_HTML = """
         }
         .badge-tcp { background: #2262b7; }
         .badge-udp { background: #7654b8; }
-        .port-value { color: #10233e; font-size: 1rem; font-weight: 800; }
+        .port-value { color: #10233e; font-size: 1rem; font-weight: 800; overflow-wrap: anywhere; }
         .target-pill {
             border: 1px solid rgba(16,35,62,.08);
             background: #10233e;
@@ -1126,7 +1154,7 @@ HEADER_HTML = """
         .panel-body { padding: 16px 18px 18px; }
         .compose-form {
             display: grid;
-            grid-template-columns: 1.15fr .72fr 1.45fr .72fr 1fr .76fr 1.15fr 1.02fr;
+            grid-template-columns: .9fr .65fr 1.35fr 1.35fr .65fr .9fr .7fr 1.1fr .95fr;
             align-items: end;
             gap: 12px;
         }
@@ -1154,7 +1182,7 @@ HEADER_HTML = """
         .delete-button:hover { background: var(--workspace-danger); border-color: var(--workspace-danger); }
         @media (max-width: 1260px) {
             .compose-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-            .field-target { grid-column: span 2 !important; }
+            .field-relay, .field-target { grid-column: span 2 !important; }
             .field-remark { grid-column: span 2 !important; }
             .field-submit { grid-column: span 2 !important; }
         }
@@ -1167,7 +1195,7 @@ HEADER_HTML = """
             .compose-panel { grid-row: auto; }
             .rules-panel { grid-row: auto; }
             .compose-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .field-target, .field-remark, .field-submit { grid-column: span 2 !important; }
+            .field-relay, .field-target, .field-remark, .field-submit { grid-column: span 2 !important; }
         }
         @media (max-width: 500px) {
             .page-title { font-size: 1.38rem; }
@@ -1176,7 +1204,7 @@ HEADER_HTML = """
             .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .metric-item:nth-child(3) { border-left: 0; }
             .compose-form { grid-template-columns: 1fr; }
-            .field-target, .field-remark, .field-submit { grid-column: auto !important; }
+            .field-relay, .field-target, .field-remark, .field-submit { grid-column: auto !important; }
             .route-path { display: none; }
         }
     </style>
@@ -1242,6 +1270,7 @@ DASHBOARD_HTML = HEADER_HTML + """
                     </select>
                     </div>
                     <div class="form-field field-listener"><label class="form-label">{{ t.local_port }}</label><input type="number" min="1" max="65535" class="form-control" name="local_port" required></div>
+                    <div class="form-field field-relay"><label class="form-label">{{ t.relay_host }}</label><input type="text" class="form-control" name="relay_host" placeholder="{{ t.relay_host_ph }}" inputmode="url"></div>
                     <div class="form-field field-target"><label class="form-label">{{ t.target_ip }}</label><input type="text" class="form-control" name="target_ip" required></div>
                     <div class="form-field field-target-port"><label class="form-label">{{ t.target_port }}</label><input type="number" min="1" max="65535" class="form-control" name="target_port" required></div>
                     <div class="form-field field-remark"><label class="form-label">{{ t.remark }}</label><input type="text" class="form-control" name="remark" placeholder="{{ t.remark_ph }}"></div>
@@ -1264,12 +1293,12 @@ DASHBOARD_HTML = HEADER_HTML + """
                 <div class="panel-header"><span>{{ t.cur_rules }}</span><span class="rule-count">{{ rules|length }}</span></div>
                 <div class="table-responsive p-0">
                     <table class="table rules-table">
-                        <thead><tr><th>{{ t.proto }}</th><th>{{ t.local_port }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th>{{ t.traffic }}<br><small class="text-muted">{{ t.traffic_note }}</small></th><th>{{ t.expires_at }}</th><th class="text-end">{{ t.action }}</th></tr></thead>
+                        <thead><tr><th>{{ t.proto }}</th><th>{{ t.relay_entry }}</th><th>{{ t.target_ip }} : {{ t.target_port }}</th><th>{{ t.remark }}</th><th>{{ t.traffic }}<br><small class="text-muted">{{ t.traffic_note }}</small></th><th>{{ t.expires_at }}</th><th class="text-end">{{ t.action }}</th></tr></thead>
                         <tbody>
                             {% for rule in rules %}
                             <tr>
                                 <td data-label="{{ t.proto }}"><span class="badge {% if rule.protocol == 'TCP' %}badge-tcp{% else %}badge-udp{% endif %}">{{ rule.protocol }}</span></td>
-                                <td data-label="{{ t.local_port }}"><span class="port-value">{{ rule.local_port }}</span></td>
+                                <td data-label="{{ t.relay_entry }}"><span class="port-value">{% if rule.relay_host %}{{ rule.relay_host }}{% else %}*{% endif %}:{{ rule.local_port }}</span></td>
                                 <td class="target-cell" data-label="{{ t.target_ip }} : {{ t.target_port }}"><span class="target-pill">{{ rule.target_ip }} : {{ rule.target_port }}</span></td>
                                 <td class="remark-cell-mobile" data-label="{{ t.remark }}"><div class="remark-cell" title="{{ rule.remark }}">{% if rule.remark %}{{ rule.remark }}{% else %}-{% endif %}</div></td>
                                 <td data-label="{{ t.traffic }}"><span class="traffic-value">{{ rule.traffic_text }}</span>{% if rule.quota_bytes %}<div class="quota-track"><div class="quota-fill" style="width:{{ rule.traffic_percent }}%"></div></div>{% endif %}</td>
@@ -1348,6 +1377,9 @@ def limit_base_bytes(limit):
 
 def limit_target_host(limit):
     return str(limit.get("target_host", "") or "") if isinstance(limit, dict) else ""
+
+def limit_relay_host(limit):
+    return str(limit.get("relay_host", "") or "") if isinstance(limit, dict) else ""
 
 def format_expires(value):
     return value.replace("T", " ") + " UTC+8" if value else "不限"
@@ -1481,6 +1513,7 @@ def refresh_domain_rules_once():
                     "expires_at": limit_expires_at(limit),
                     "base_bytes": limit_base_bytes(limit),
                     "target_host": target_host,
+                    "relay_host": limit_relay_host(limit),
                 }
                 changed = True
             continue
@@ -1504,6 +1537,7 @@ def refresh_domain_rules_once():
             "expires_at": limit_expires_at(limit),
             "base_bytes": rule['traffic_bytes'],
             "target_host": target_host,
+            "relay_host": limit_relay_host(limit),
         }
         changed = True
     if changed:
@@ -1552,6 +1586,7 @@ def get_parsed_rules():
                         'local_port': local_port,
                         'target_ip': target_ip,
                         'target_port': target_port,
+                        'relay_host': limit_relay_host(limit),
                         'remark': remark,
                         'rule_comment': rule_comment,
                         'track_id': track_id,
@@ -1568,10 +1603,29 @@ def get_parsed_rules():
 def valid_port(value):
     return value and value.isdigit() and 1 <= int(value) <= 65535
 
-def rule_exists(protocol, local_port):
+def normalize_relay_host(value):
+    value = (value or "").strip().rstrip(".")
+    if not value:
+        return ""
+    host = value.lower()
+    if not host.isascii():
+        raise ValueError("invalid relay host")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        raise ValueError("relay host must be a domain")
+    labels = host.split(".")
+    if len(host) > 253 or len(labels) < 2 or any(not re.fullmatch(r"(?!-)[a-z0-9-]{1,63}(?<!-)", label) for label in labels):
+        raise ValueError("invalid relay host")
+    if not socket.gethostbyname_ex(host)[2]:
+        raise ValueError("relay host does not resolve")
+    return host
+
+def rule_exists(local_port):
     return any(
-        rule['protocol'].lower() == protocol
-        and rule['local_port'] == local_port
+        rule['local_port'] == local_port
         for rule in get_parsed_rules()
     )
 
@@ -1611,8 +1665,14 @@ def add_rule():
     expires_at = parse_expires_at(request.form.get('expires_at'))
 
     if not valid_port(l_port) or not valid_port(t_port): return redirect(url_for('index', msg=t['err_port'], status="danger"))
+    if int(l_port) == PANEL_PORT: return redirect(url_for('index', msg=t['err_panel_port'], status="warning"))
     if quota_bytes is None: return redirect(url_for('index', msg=t['err_quota'], status="danger"))
     if expires_at is None: return redirect(url_for('index', msg=t['err_expires'], status="danger"))
+
+    try:
+        relay_host = normalize_relay_host(request.form.get('relay_host'))
+    except Exception:
+        return redirect(url_for('index', msg=t['err_relay_host'], status="danger"))
     
     # --- 增加域名解析逻辑 ---
     try:
@@ -1625,7 +1685,7 @@ def add_rule():
         remark = f"{remark} [{t_input}]".strip()
     
     protos = ['tcp', 'udp'] if p == 'all' else [p]
-    if any(rule_exists(proto, l_port) for proto in protos):
+    if rule_exists(l_port):
         return redirect(url_for('index', msg=t['err_duplicate'], status="warning"))
 
     created_rules = []
@@ -1634,12 +1694,13 @@ def add_rule():
         for proto in protos:
             track_id = create_forwarding_rule(proto, l_port, t_ip, t_port, remark)
             created_rules.append((proto, track_id))
-            if quota_bytes or expires_at or t_ip != t_input:
+            if quota_bytes or expires_at or t_ip != t_input or relay_host:
                 quotas[track_id] = {
                     "quota_bytes": quota_bytes,
                     "expires_at": expires_at,
                     "base_bytes": 0,
                     "target_host": t_input if t_ip != t_input else "",
+                    "relay_host": relay_host,
                 }
         save_quotas(quotas)
         return redirect(url_for('index', msg=t['add_success'], status="success"))
