@@ -1,0 +1,132 @@
+name: Lite build and release
+
+on:
+  push:
+    branches:
+      - lite
+    tags:
+      - "lite-v*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "install.sh"
+      - "src/**"
+      - ".github/workflows/lite-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate installer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check Bash syntax and versions
+        shell: bash
+        run: |
+          bash -n install.sh
+          crate_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+          installer_version=$(sed -n 's/^LITE_VERSION="${LITE_VERSION:-\([^"]*\)}"/\1/p' install.sh)
+          test "$crate_version" = "$installer_version"
+
+  build:
+    name: Build ${{ matrix.asset }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            asset: iptables-panel-linux-amd64
+          - target: aarch64-unknown-linux-musl
+            asset: iptables-panel-linux-arm64
+          - target: armv7-unknown-linux-musleabihf
+            asset: iptables-panel-linux-armv7
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Verify release version
+        if: startsWith(github.ref, 'refs/tags/lite-v')
+        shell: bash
+        run: |
+          crate_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+          tag_version=${GITHUB_REF_NAME#lite-v}
+          test "$crate_version" = "$tag_version"
+
+      - name: Build static binary
+        run: cross build --locked --release --target "${{ matrix.target }}"
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/iptables-panel" "dist/${{ matrix.asset }}"
+          cd dist
+          sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+
+      - name: Smoke-test amd64 runtime
+        if: matrix.asset == 'iptables-panel-linux-amd64'
+        shell: bash
+        run: |
+          crate_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+          test "$(dist/${{ matrix.asset }} --version)" = "iptables-panel-lite $crate_version"
+          mkdir -p fakebin
+          printf '#!/bin/sh\nexit 0\n' > fakebin/sysctl
+          chmod +x fakebin/sysctl
+          PATH="$PWD/fakebin:$PATH" dist/${{ matrix.asset }} --port 18080 &
+          panel_pid=$!
+          trap 'kill "$panel_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            curl -fsS http://127.0.0.1:18080/login >/dev/null && break
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:18080/login >/dev/null
+          rss_kb=$(ps -o rss= -p "$panel_pid" | tr -d ' ')
+          echo "Idle RSS: ${rss_kb} KB"
+          test "$rss_kb" -lt 32768
+          kill "$panel_pid"
+          wait "$panel_pid" || true
+          trap - EXIT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/lite-v')
+    needs:
+      - validate
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish Lite release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*
+          body: |
+            Low-memory Rust release for the permanent `lite` branch.
+
+            Assets are statically linked and include SHA-256 checksum files.
